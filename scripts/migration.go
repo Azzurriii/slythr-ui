@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/config"
+	config "github.com/Azzurriii/slythr-go-backend/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

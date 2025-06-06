@@ -9,12 +9,30 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/config"
-	"github.com/Azzurriii/slythr-go-backend/internal/database"
-	"github.com/Azzurriii/slythr-go-backend/internal/routes"
-	"github.com/Azzurriii/slythr-go-backend/internal/server"
+	config "github.com/Azzurriii/slythr-go-backend/config"
+	_ "github.com/Azzurriii/slythr-go-backend/docs"
+	database "github.com/Azzurriii/slythr-go-backend/internal/infrastructure/database"
+	routes "github.com/Azzurriii/slythr-go-backend/internal/interface/http/routes"
+	server "github.com/Azzurriii/slythr-go-backend/internal/interface/server"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title Slyther Go Backend API
+// @version 1.0
+// @description This is a sample server for Slyther Go Backend.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8080
+// @BasePath /api/v1
+// @schemes http https
 func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig()
@@ -38,7 +56,10 @@ func main() {
 	defer redisClient.Close()
 
 	// Setup router
-	router := routes.SetupRouter(db)
+	router := routes.SetupRouter(db, cfg)
+
+	// Swagger endpoint
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Use the server abstraction
 	srv := server.NewServer(router)

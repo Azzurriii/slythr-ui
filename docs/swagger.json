@@ -1,0 +1,120 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "This is a sample server for Slyther Go Backend.",
+        "title": "Slyther Go Backend API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/contracts/{address}": {
+            "get": {
+                "description": "Get a cached smart contract from the database by its address and network",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contracts"
+                ],
+                "summary": "Get contract from database",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Contract Address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "ethereum",
+                        "description": "Network Name",
+                        "name": "network",
+                        "in": "query"
+                    }
+                ],
+                "responses": {}
+            }
+        },
+        "/contracts/{address}/source-code": {
+            "get": {
+                "description": "Get the source code of a smart contract from Etherscan by its address and save it to the database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contracts"
+                ],
+                "summary": "Get contract source code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Contract Address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "ethereum",
+                        "description": "Network Name",
+                        "name": "network",
+                        "in": "query"
+                    }
+                ],
+                "responses": {}
+            },
+            "post": {
+                "description": "Forces a refresh of the source code of a smart contract from Etherscan by its address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contracts"
+                ],
+                "summary": "Refresh contract source code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Contract Address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "ethereum",
+                        "description": "Network Name",
+                        "name": "network",
+                        "in": "query"
+                    }
+                ],
+                "responses": {}
+            }
+        }
+    }
+}

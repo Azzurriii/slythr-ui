@@ -1,38 +1,38 @@
 version: "3.8"
 
 services:
-  app:
-    env_file:
-      - .env
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "${SERVER_PORT}:${SERVER_PORT}"
-    depends_on:
-      - postgres
-      - mongodb
-      - redis
-    environment:
-      # Server
-      - SERVER_PORT=${SERVER_PORT}
-      - SERVER_ENV=${SERVER_ENV}
+  # app:
+  #   env_file:
+  #     - .env
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "${SERVER_PORT}:${SERVER_PORT}"
+  #   depends_on:
+  #     - postgres
+  #     - mongodb
+  #     - redis
+  #   environment:
+  #     # Server
+  #     - SERVER_PORT=${SERVER_PORT}
+  #     - SERVER_ENV=${SERVER_ENV}
 
-      # Database
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_SSL_MODE=${DB_SSL_MODE}
+  #     # Database
+  #     - DB_HOST=${DB_HOST}
+  #     - DB_PORT=${DB_PORT}
+  #     - DB_USER=${DB_USER}
+  #     - DB_PASSWORD=${DB_PASSWORD}
+  #     - DB_NAME=${DB_NAME}
+  #     - DB_SSL_MODE=${DB_SSL_MODE}
 
-      # Redis
-      - REDIS_ADDR=${REDIS_ADDR}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_DB=${REDIS_DB}
-    networks:
-      - app-network
-    restart: unless-stopped
+  #     # Redis
+  #     - REDIS_ADDR=${REDIS_ADDR}
+  #     - REDIS_PASSWORD=${REDIS_PASSWORD}
+  #     - REDIS_DB=${REDIS_DB}
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
 
   postgres:
     image: postgres:17-alpine
@@ -44,16 +44,6 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  mongodb:
-    image: mongo:7.0.5
-    ports:
-      - "${MONGODB_PORT}:27017"
-    volumes:
-      - mongodb_data:/data/db
     networks:
       - app-network
     restart: unless-stopped
@@ -74,5 +64,4 @@ networks:
 
 volumes:
   postgres_data:
-  mongodb_data:
   redis_data:
