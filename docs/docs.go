@@ -39,6 +39,8 @@ const docTemplate = `{
                 "summary": "Get contract from database",
                 "parameters": [
                     {
+                        "maxLength": 42,
+                        "minLength": 42,
                         "type": "string",
                         "description": "Contract Address",
                         "name": "address",
@@ -46,6 +48,18 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "ethereum",
+                            "polygon",
+                            "bsc",
+                            "base",
+                            "arbitrum",
+                            "avalanche",
+                            "optimism",
+                            "gnosis",
+                            "fantom",
+                            "celo"
+                        ],
                         "type": "string",
                         "default": "ethereum",
                         "description": "Network Name",
@@ -68,9 +82,11 @@ const docTemplate = `{
                 "tags": [
                     "contracts"
                 ],
-                "summary": "Get contract source code",
+                "summary": "Fetch contract source code",
                 "parameters": [
                     {
+                        "maxLength": 42,
+                        "minLength": 42,
                         "type": "string",
                         "description": "Contract Address",
                         "name": "address",
@@ -78,36 +94,18 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "default": "ethereum",
-                        "description": "Network Name",
-                        "name": "network",
-                        "in": "query"
-                    }
-                ],
-                "responses": {}
-            },
-            "post": {
-                "description": "Forces a refresh of the source code of a smart contract from Etherscan by its address",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "contracts"
-                ],
-                "summary": "Refresh contract source code",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Contract Address",
-                        "name": "address",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
+                        "enum": [
+                            "ethereum",
+                            "polygon",
+                            "bsc",
+                            "base",
+                            "arbitrum",
+                            "avalanche",
+                            "optimism",
+                            "gnosis",
+                            "fantom",
+                            "celo"
+                        ],
                         "type": "string",
                         "default": "ethereum",
                         "description": "Network Name",

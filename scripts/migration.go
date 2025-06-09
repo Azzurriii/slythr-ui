@@ -1,10 +1,9 @@
 package scripts
 
 import (
-	"fmt"
 	"log"
 
-	config "github.com/Azzurriii/slythr-go-backend/internal/config"
+	config "github.com/Azzurriii/slythr-go-backend/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -17,24 +16,27 @@ type User struct {
 }
 
 // Migrate function to run database migrations
-func Migrate() {
+func Migrate() error {
 	// Load from environment variables or configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to load config: %v", err)
+		return err
 	}
 
 	dsn := cfg.Database.DSN()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
+		return err
 	}
 
 	// AutoMigrate runs the migration
-	err = db.AutoMigrate(&User{})
-	if err != nil {
+	if err := db.AutoMigrate(&User{}); err != nil {
 		log.Fatalf("Migration failed: %v", err)
+		return err
 	}
 
-	fmt.Println("Migration completed successfully!")
+	log.Println("Migration completed successfully!")
+	return nil
 }

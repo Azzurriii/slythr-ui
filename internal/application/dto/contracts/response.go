@@ -2,7 +2,6 @@ package contracts
 
 import "time"
 
-// GetContractSourceCodeResponse represents the response for getting contract source code
 type GetContractSourceCodeResponse struct {
 	Address    string     `json:"address"`
 	SourceCode string     `json:"source_code"`
@@ -11,7 +10,6 @@ type GetContractSourceCodeResponse struct {
 	CachedAt   *time.Time `json:"cached_at,omitempty"`
 }
 
-// ContractResponse represents the response for getting contract details
 type ContractResponse struct {
 	Address         string    `json:"address"`
 	Network         string    `json:"network"`

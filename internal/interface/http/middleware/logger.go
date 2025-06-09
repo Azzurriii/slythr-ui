@@ -1,19 +1,23 @@
-// internal/middleware/logger.go
 package middleware
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func Logger() gin.HandlerFunc {
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(gin.DefaultWriter),
+		zapcore.InfoLevel,
+	))
+
 	return func(c *gin.Context) {
-		// Start timer
 		start := time.Now()
 
-		// Process request
 		c.Next()
 
 		// Log request details
@@ -22,7 +26,20 @@ func Logger() gin.HandlerFunc {
 		method := c.Request.Method
 		path := c.Request.URL.Path
 
-		// You can replace this with your preferred logging solution
-		fmt.Printf("[%d] %s %s - %v\n", status, method, path, latency)
+		fields := []zap.Field{
+			zap.Int("status", status),
+			zap.String("method", method),
+			zap.String("path", path),
+			zap.Duration("latency", latency),
+		}
+
+		switch {
+		case status >= 500:
+			logger.Error("Server error", fields...)
+		case status >= 400:
+			logger.Warn("Client error", fields...)
+		default:
+			logger.Info("Request processed", fields...)
+		}
 	}
 }

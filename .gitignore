@@ -28,3 +28,5 @@ vendor/
 *.log
 
 tmp/
+
+.cursor/

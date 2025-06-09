@@ -22,11 +22,24 @@ paths:
       parameters:
       - description: Contract Address
         in: path
+        maxLength: 42
+        minLength: 42
         name: address
         required: true
         type: string
       - default: ethereum
         description: Network Name
+        enum:
+        - ethereum
+        - polygon
+        - bsc
+        - base
+        - arbitrum
+        - avalanche
+        - optimism
+        - gnosis
+        - fantom
+        - celo
         in: query
         name: network
         type: string
@@ -45,40 +58,31 @@ paths:
       parameters:
       - description: Contract Address
         in: path
+        maxLength: 42
+        minLength: 42
         name: address
         required: true
         type: string
       - default: ethereum
         description: Network Name
+        enum:
+        - ethereum
+        - polygon
+        - bsc
+        - base
+        - arbitrum
+        - avalanche
+        - optimism
+        - gnosis
+        - fantom
+        - celo
         in: query
         name: network
         type: string
       produces:
       - application/json
       responses: {}
-      summary: Get contract source code
-      tags:
-      - contracts
-    post:
-      consumes:
-      - application/json
-      description: Forces a refresh of the source code of a smart contract from Etherscan
-        by its address
-      parameters:
-      - description: Contract Address
-        in: path
-        name: address
-        required: true
-        type: string
-      - default: ethereum
-        description: Network Name
-        in: query
-        name: network
-        type: string
-      produces:
-      - application/json
-      responses: {}
-      summary: Refresh contract source code
+      summary: Fetch contract source code
       tags:
       - contracts
 schemes:

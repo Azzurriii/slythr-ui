@@ -4,45 +4,67 @@ import (
 	config "github.com/Azzurriii/slythr-go-backend/config"
 	contractHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/contracts"
 	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
+	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
+	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/external"
 	"github.com/Azzurriii/slythr-go-backend/internal/interface/http/middleware"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-// Route defines the structure for dynamic routing
-type Route struct {
-	Method      string
-	Path        string
-	HandlerFunc gin.HandlerFunc
+type Logger interface {
+	Errorf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Debugf(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
 }
 
-// Controller defines the structure for a controller with routes
-type Controller struct {
-	Routes []Route
+type RouterDependencies struct {
+	ContractRepo    repository.ContractRepository
+	EtherscanClient external.EtherscanService
+	Logger          Logger
+	Config          *config.Config
 }
 
-// SetupRouter dynamically sets up routes
-func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
-	gin.SetMode(cfg.Server.Env)
+func SetupRouter(deps *RouterDependencies) *gin.Engine {
+	gin.SetMode(deps.Config.Server.Env)
 
 	r := gin.Default()
 	r.Use(middleware.CORS())
 	r.Use(middleware.Logger())
 
-	// Initialize services
-	contractService := services.NewContractServiceWithDefaults(cfg, db)
+	contractService := services.NewContractService(
+		deps.ContractRepo,
+		deps.EtherscanClient,
+		deps.Logger,
+	)
 
-	// Initialize handlers
 	contractHandler := contractHandlers.NewContractHandler(contractService)
 
-	// API v1 group
-	apiV1 := r.Group("/api/v1")
-	{
-		// Contract routes
-		contractRoutes := apiV1.Group("/contracts")
-		{
-			contractRoutes.GET("/:address/source-code", contractHandler.GetSourceCode)
-		}
-	}
+	setupAPIRoutes(r, contractHandler)
+
 	return r
+}
+
+func setupAPIRoutes(router *gin.Engine, contractHandler *contractHandlers.ContractHandler) {
+	apiV1 := router.Group("/api/v1")
+	{
+		setupContractRoutes(apiV1, contractHandler)
+	}
+}
+
+func setupContractRoutes(group *gin.RouterGroup, handler *contractHandlers.ContractHandler) {
+	contracts := group.Group("/contracts")
+	{
+		contracts.GET("/:address", handler.GetContract)
+		contracts.GET("/:address/source-code", handler.GetSourceCode)
+	}
+}
+
+func SetupRouterLegacy(repo repository.ContractRepository, cfg *config.Config, etherscanClient external.EtherscanService, logger Logger) *gin.Engine {
+	deps := &RouterDependencies{
+		ContractRepo:    repo,
+		EtherscanClient: etherscanClient,
+		Logger:          logger,
+		Config:          cfg,
+	}
+	return SetupRouter(deps)
 }

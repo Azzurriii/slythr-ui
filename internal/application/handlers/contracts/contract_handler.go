@@ -1,102 +1,44 @@
 package contracts
 
 import (
-	"errors"
 	"net/http"
 
 	contractsDTO "github.com/Azzurriii/slythr-go-backend/internal/application/dto/contracts"
 	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
-	apperrors "github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
+	"github.com/Azzurriii/slythr-go-backend/internal/domain/constants"
+	domainerrors "github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
 	"github.com/gin-gonic/gin"
 )
 
 type ContractHandler struct {
-	contractService *services.ContractService
+	contractService services.ContractServiceInterface
 }
 
-func NewContractHandler(contractService *services.ContractService) *ContractHandler {
+func NewContractHandler(contractService services.ContractServiceInterface) *ContractHandler {
 	return &ContractHandler{
 		contractService: contractService,
 	}
 }
 
 // GetSourceCode godoc
-// @Summary Get contract source code
+// @Summary Fetch contract source code
 // @Description Get the source code of a smart contract from Etherscan by its address and save it to the database
 // @Tags contracts
 // @Accept json
 // @Produce json
-// @Param address path string true "Contract Address"
-// @Param network query string false "Network Name" default(ethereum)
+// @Param address path string true "Contract Address" minlength(42) maxlength(42)
+// @Param network query string false "Network Name" default(ethereum) Enums(ethereum,polygon,bsc,base,arbitrum,avalanche,optimism,gnosis,fantom,celo)
 // @Router /contracts/{address}/source-code [get]
 func (h *ContractHandler) GetSourceCode(c *gin.Context) {
-	address := c.Param("address")
-	network := c.DefaultQuery("network", services.NetworkEthereum) // Default to Ethereum
-
-	if address == "" {
-		c.JSON(http.StatusBadRequest, apperrors.NewErrorResponse(apperrors.ErrInvalidAddress))
-		return
-	}
-
-	req := &contractsDTO.GetContractSourceCodeRequest{
-		Address: address,
-		Network: network,
-	}
-
-	if err := req.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, apperrors.NewErrorResponse(err))
-		return
-	}
-
-	response, err := h.contractService.GetAndSaveContractSourceCode(c.Request.Context(), req)
+	req, err := h.buildGetSourceCodeRequest(c)
 	if err != nil {
-		switch {
-		case errors.Is(err, apperrors.ErrContractNotFound):
-			c.JSON(http.StatusNotFound, apperrors.NewErrorResponse(err))
-		case errors.Is(err, apperrors.ErrInvalidAddress):
-			c.JSON(http.StatusBadRequest, apperrors.NewErrorResponse(err))
-		default:
-			c.JSON(http.StatusInternalServerError, apperrors.NewErrorResponse(err))
-		}
+		h.respondWithError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, response)
-}
-
-// RefreshSourceCode godoc
-// @Summary Refresh contract source code
-// @Description Forces a refresh of the source code of a smart contract from Etherscan by its address
-// @Tags contracts
-// @Accept json
-// @Produce json
-// @Param address path string true "Contract Address"
-// @Param network query string false "Network Name" default(ethereum)
-// @Router /contracts/{address}/source-code [post]
-func (h *ContractHandler) RefreshSourceCode(c *gin.Context) {
-	address := c.Param("address")
-	network := c.DefaultQuery("network", services.NetworkEthereum) // Default to Ethereum
-
-	req := &contractsDTO.RefreshContractSourceCodeRequest{
-		Address: address,
-		Network: network,
-	}
-
-	if err := req.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, apperrors.NewErrorResponse(err))
-		return
-	}
-
-	response, err := h.contractService.RefreshContractSourceCode(c.Request.Context(), req)
+	response, err := h.contractService.FetchContractSourceCode(c.Request.Context(), req)
 	if err != nil {
-		switch {
-		case errors.Is(err, apperrors.ErrContractNotFound):
-			c.JSON(http.StatusNotFound, apperrors.NewErrorResponse(err))
-		case errors.Is(err, apperrors.ErrInvalidAddress):
-			c.JSON(http.StatusBadRequest, apperrors.NewErrorResponse(err))
-		default:
-			c.JSON(http.StatusInternalServerError, apperrors.NewErrorResponse(err))
-		}
+		h.respondWithError(c, err)
 		return
 	}
 
@@ -109,28 +51,60 @@ func (h *ContractHandler) RefreshSourceCode(c *gin.Context) {
 // @Tags contracts
 // @Accept json
 // @Produce json
-// @Param address path string true "Contract Address"
-// @Param network query string false "Network Name" default(ethereum)
+// @Param address path string true "Contract Address" minlength(42) maxlength(42)
+// @Param network query string false "Network Name" default(ethereum) Enums(ethereum,polygon,bsc,base,arbitrum,avalanche,optimism,gnosis,fantom,celo)
 // @Router /contracts/{address} [get]
 func (h *ContractHandler) GetContract(c *gin.Context) {
 	address := c.Param("address")
-	network := c.DefaultQuery("network", services.NetworkEthereum)
+	network := c.DefaultQuery("network", constants.NetworkEthereum)
 
-	if address == "" {
-		c.JSON(http.StatusBadRequest, apperrors.NewErrorResponse(apperrors.ErrInvalidAddress))
+	if err := h.validateAddressAndNetwork(address, network); err != nil {
+		h.respondWithError(c, err)
 		return
 	}
 
 	response, err := h.contractService.GetContractByAddressAndNetwork(c.Request.Context(), address, network)
 	if err != nil {
-		switch {
-		case errors.Is(err, apperrors.ErrContractNotFound):
-			c.JSON(http.StatusNotFound, apperrors.NewErrorResponse(err))
-		default:
-			c.JSON(http.StatusInternalServerError, apperrors.NewErrorResponse(err))
-		}
+		h.respondWithError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// Helpers
+
+func (h *ContractHandler) buildGetSourceCodeRequest(c *gin.Context) (*contractsDTO.GetContractSourceCodeRequest, error) {
+	address := c.Param("address")
+	network := c.DefaultQuery("network", constants.NetworkEthereum)
+
+	req := &contractsDTO.GetContractSourceCodeRequest{
+		Address: address,
+		Network: network,
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func (h *ContractHandler) validateAddressAndNetwork(address, network string) error {
+	if address == "" || len(address) != 42 {
+		return domainerrors.ErrInvalidAddress
+	}
+
+	if !constants.IsValidNetwork(network) {
+		return domainerrors.ErrInvalidNetwork
+	}
+
+	return nil
+}
+
+// Handles error responses in a consistent way
+func (h *ContractHandler) respondWithError(c *gin.Context, err error) {
+	statusCode := domainerrors.GetHTTPStatusCode(err)
+	errorResponse := domainerrors.NewErrorResponse(err)
+	c.JSON(statusCode, errorResponse)
 }
