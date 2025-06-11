@@ -49,45 +49,38 @@ func NewContractService(
 	}
 }
 
-// FetchContractSourceCode retrieves contract source code and saves it if not exists
 func (s *ContractService) FetchContractSourceCode(ctx context.Context, req *contracts.GetContractSourceCodeRequest) (*contracts.GetContractSourceCodeResponse, error) {
 	if err := req.Validate(); err != nil {
 		s.logger.Warnf("Invalid request for contract source code: %v", err)
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
 
-	// Check if contract exists in cache
 	existingContract, err := s.contractRepo.FindByAddressAndNetwork(ctx, req.Address, req.Network)
 	if err != nil && !errors.Is(err, domainerrors.ErrContractNotFound) {
 		s.logger.Errorf("Failed to check existing contract: %v", err)
 		return nil, fmt.Errorf("failed to check existing contract: %w", err)
 	}
 
-	// Return cached data(if exists)
 	if existingContract != nil {
 		s.logger.Infof("Returning cached contract source code for address: %s on network: %s", req.Address, req.Network)
 		return s.buildSourceCodeResponse(existingContract, true), nil
 	}
 
-	// Fetch contract from external service
 	contractInfo, err := s.fetchContractFromExternal(ctx, req.Address, req.Network)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create contract entity
 	contract, err := s.createContractEntity(req.Address, req.Network, contractInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create contract entity: %w", err)
 	}
 
-	// Save contract by goroutine
 	go s.saveContractAsync(contract)
 
 	return s.buildSourceCodeResponse(contract, false), nil
 }
 
-// GetContractByAddressAndNetwork retrieves a contract by its address and network
 func (s *ContractService) GetContractByAddressAndNetwork(ctx context.Context, address, network string) (*contracts.ContractResponse, error) {
 	contract, err := s.contractRepo.FindByAddressAndNetwork(ctx, address, network)
 	if err != nil {
@@ -99,20 +92,31 @@ func (s *ContractService) GetContractByAddressAndNetwork(ctx context.Context, ad
 }
 
 func (s *ContractService) fetchContractFromExternal(ctx context.Context, address, network string) (*external.ContractInfo, error) {
-	contractInfo, err := s.etherscanClient.GetContractDetails(ctx, address, network)
+	processedSourceCode, err := s.etherscanClient.GetContractSourceCode(ctx, address, network)
 	if err != nil {
 		var etherscanErr external.EtherscanError
 		if errors.As(err, &etherscanErr) {
 			s.logger.Warnf("Contract not found on external service: %s", address)
 			return nil, domainerrors.ErrContractNotFound
 		}
-		s.logger.Errorf("Failed to get contract details from external service: %v", err)
-		return nil, fmt.Errorf("failed to get contract details: %w", err)
+		s.logger.Errorf("Failed to get contract source code from external service: %v", err)
+		return nil, fmt.Errorf("failed to get contract source code: %w", err)
 	}
 
-	if contractInfo.SourceCode == "" {
+	if processedSourceCode == "" {
 		s.logger.Warnf("Empty source code returned for contract: %s", address)
 		return nil, domainerrors.ErrEmptySourceCode
+	}
+
+	contractInfo, err := s.etherscanClient.GetContractDetails(ctx, address, network)
+	if err != nil {
+		var etherscanErr external.EtherscanError
+		if errors.As(err, &etherscanErr) {
+			s.logger.Warnf("Contract details not found on external service: %s", address)
+			return nil, domainerrors.ErrContractNotFound
+		}
+		s.logger.Errorf("Failed to get contract details from external service: %v", err)
+		return nil, fmt.Errorf("failed to get contract details: %w", err)
 	}
 
 	return contractInfo, nil

@@ -1,15 +1,17 @@
 basePath: /api/v1
+definitions:
+  static_analysis.AnalyzeRequest:
+    properties:
+      source:
+        minLength: 1
+        type: string
+    required:
+    - source
+    type: object
 host: localhost:8080
 info:
-  contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
-  description: This is a sample server for Slyther Go Backend.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
+  contact: {}
+  description: This is a server for Slyther Go Backend.
   title: Slyther Go Backend API
   version: "1.0"
 paths:
@@ -85,6 +87,25 @@ paths:
       summary: Fetch contract source code
       tags:
       - contracts
+  /static-analysis:
+    post:
+      consumes:
+      - application/json
+      description: Performs static security analysis on Solidity source code using
+        Slither
+      parameters:
+      - description: Contract source code
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/static_analysis.AnalyzeRequest'
+      produces:
+      - application/json
+      responses: {}
+      summary: Analyze Solidity contract for security vulnerabilities
+      tags:
+      - static-analysis
 schemes:
 - http
 - https

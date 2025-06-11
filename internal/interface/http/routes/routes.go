@@ -3,6 +3,7 @@ package routes
 import (
 	config "github.com/Azzurriii/slythr-go-backend/config"
 	contractHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/contracts"
+	staticAnalysisHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/static_analysis"
 	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
 	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/external"
@@ -38,16 +39,18 @@ func SetupRouter(deps *RouterDependencies) *gin.Engine {
 	)
 
 	contractHandler := contractHandlers.NewContractHandler(contractService)
+	staticAnalysisHandler := staticAnalysisHandlers.NewStaticAnalysisHandler()
 
-	setupAPIRoutes(r, contractHandler)
+	setupAPIRoutes(r, contractHandler, staticAnalysisHandler)
 
 	return r
 }
 
-func setupAPIRoutes(router *gin.Engine, contractHandler *contractHandlers.ContractHandler) {
+func setupAPIRoutes(router *gin.Engine, contractHandler *contractHandlers.ContractHandler, staticAnalysisHandler *staticAnalysisHandlers.StaticAnalysisHandler) {
 	apiV1 := router.Group("/api/v1")
 	{
 		setupContractRoutes(apiV1, contractHandler)
+		setupStaticAnalysisRoutes(apiV1, staticAnalysisHandler)
 	}
 }
 
@@ -57,6 +60,10 @@ func setupContractRoutes(group *gin.RouterGroup, handler *contractHandlers.Contr
 		contracts.GET("/:address", handler.GetContract)
 		contracts.GET("/:address/source-code", handler.GetSourceCode)
 	}
+}
+
+func setupStaticAnalysisRoutes(group *gin.RouterGroup, handler *staticAnalysisHandlers.StaticAnalysisHandler) {
+	group.POST("/static-analysis", handler.AnalyzeContract)
 }
 
 func SetupRouterLegacy(repo repository.ContractRepository, cfg *config.Config, etherscanClient external.EtherscanService, logger Logger) *gin.Engine {

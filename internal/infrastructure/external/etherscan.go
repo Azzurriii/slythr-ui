@@ -69,11 +69,8 @@ type apiResponse struct {
 	Result  json.RawMessage `json:"result"`
 }
 
-type multiFileSource struct {
-	Sources map[string]fileContent `json:"sources"`
-}
-
-type fileContent struct {
+// Simplified source structures for parsing
+type sourceFile struct {
 	Content string `json:"content"`
 }
 
@@ -105,7 +102,7 @@ func (c *EtherscanClient) GetContractSourceCode(ctx context.Context, address str
 		return "", err
 	}
 
-	return c.processSourceCode(contractInfo.SourceCode)
+	return c.extractMainSource(contractInfo.SourceCode, contractInfo.ContractName)
 }
 
 func (c *EtherscanClient) GetContractDetails(ctx context.Context, address string, network string) (*ContractInfo, error) {
@@ -114,7 +111,7 @@ func (c *EtherscanClient) GetContractDetails(ctx context.Context, address string
 		return nil, err
 	}
 
-	processedSourceCode, err := c.processSourceCode(contractInfo.SourceCode)
+	processedSourceCode, err := c.extractMainSource(contractInfo.SourceCode, contractInfo.ContractName)
 	if err != nil {
 		return nil, err
 	}
@@ -206,62 +203,147 @@ func (c *EtherscanClient) parseAPIResponse(body []byte, address string) (Contrac
 	return contractInfoResult[0], nil
 }
 
-func (c *EtherscanClient) processSourceCode(sourceCode string) (string, error) {
+// extractMainSource efficiently extracts only the main contract source
+func (c *EtherscanClient) extractMainSource(sourceCode string, contractName string) (string, error) {
 	if len(sourceCode) == 0 {
 		return "", fmt.Errorf("empty source code")
 	}
 
+	// If not JSON format, return as-is (single file contract)
 	if sourceCode[0] != '{' {
 		return sourceCode, nil
 	}
 
-	if processedSource := c.parseMultiFileSource(sourceCode); processedSource != "" {
-		return processedSource, nil
+	// Handle double-encoded JSON
+	if len(sourceCode) > 1 && sourceCode[0] == '{' && sourceCode[1] == '{' {
+		var jsonString string
+		if err := json.Unmarshal([]byte(sourceCode), &jsonString); err == nil {
+			sourceCode = jsonString
+		} else if len(sourceCode) >= 4 {
+			// Try removing extra braces
+			sourceCode = sourceCode[1 : len(sourceCode)-1]
+		}
 	}
 
-	return sourceCode, nil
+	// Use json.RawMessage for efficient parsing without full unmarshaling
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(sourceCode), &raw); err != nil {
+		return sourceCode, nil // Return as-is if can't parse
+	}
+
+	// Check if it has the standard format with "sources" field
+	if sourcesRaw, ok := raw["sources"]; ok {
+		return c.extractFromSources(sourcesRaw, contractName), nil
+	}
+
+	// Direct format (map of files)
+	return c.extractFromRawMap(raw, contractName), nil
 }
 
-func (c *EtherscanClient) parseMultiFileSource(sourceCode string) string {
-	var multiFile multiFileSource
-	if err := json.Unmarshal([]byte(sourceCode), &multiFile); err == nil && len(multiFile.Sources) > 0 {
-		return c.combineSourceFiles(multiFile.Sources)
+// extractFromSources handles the standard multi-file format
+func (c *EtherscanClient) extractFromSources(sourcesRaw json.RawMessage, contractName string) string {
+	var sources map[string]sourceFile
+	if err := json.Unmarshal(sourcesRaw, &sources); err != nil {
+		return ""
 	}
 
-	// Try alternative format (direct map)
-	var altFormat map[string]fileContent
-	if err := json.Unmarshal([]byte(sourceCode), &altFormat); err == nil && len(altFormat) > 0 {
-		return c.combineSourceFiles(altFormat)
+	// Priority order for finding the main contract
+	patterns := []func(string) bool{
+		// 1. Exact match in contracts directory
+		func(path string) bool {
+			return strings.HasSuffix(path, "contracts/"+contractName+".sol")
+		},
+		// 2. Exact filename match
+		func(path string) bool {
+			return strings.HasSuffix(path, "/"+contractName+".sol") || path == contractName+".sol"
+		},
+		// 3. Any file in contracts directory (non-library)
+		func(path string) bool {
+			return strings.Contains(path, "contracts/") &&
+				strings.HasSuffix(path, ".sol") &&
+				!c.isLibraryPath(path)
+		},
+		// 4. Any non-library Solidity file
+		func(path string) bool {
+			return strings.HasSuffix(path, ".sol") && !c.isLibraryPath(path)
+		},
+	}
+
+	// Try each pattern in order
+	for _, pattern := range patterns {
+		for path, file := range sources {
+			if pattern(path) {
+				return file.Content
+			}
+		}
+	}
+
+	// Fallback: return first available file
+	for _, file := range sources {
+		return file.Content
 	}
 
 	return ""
 }
 
-func (c *EtherscanClient) combineSourceFiles(sources map[string]fileContent) string {
-	if len(sources) == 0 {
-		return ""
+// extractFromRawMap handles direct map format
+func (c *EtherscanClient) extractFromRawMap(raw map[string]json.RawMessage, contractName string) string {
+	// Similar logic but working with RawMessage
+	patterns := []func(string) bool{
+		func(path string) bool {
+			return strings.HasSuffix(path, "contracts/"+contractName+".sol")
+		},
+		func(path string) bool {
+			return strings.HasSuffix(path, "/"+contractName+".sol") || path == contractName+".sol"
+		},
+		func(path string) bool {
+			return strings.Contains(path, "contracts/") &&
+				strings.HasSuffix(path, ".sol") &&
+				!c.isLibraryPath(path)
+		},
+		func(path string) bool {
+			return strings.HasSuffix(path, ".sol") && !c.isLibraryPath(path)
+		},
 	}
 
-	estimatedSize := 0
-	for path, content := range sources {
-		estimatedSize += len(path) + len(content.Content) + 20
+	for _, pattern := range patterns {
+		for path, rawFile := range raw {
+			if pattern(path) {
+				var file sourceFile
+				if err := json.Unmarshal(rawFile, &file); err == nil {
+					return file.Content
+				}
+			}
+		}
 	}
 
-	builder := stringBuilderPool.Get().(*strings.Builder)
-	defer func() {
-		builder.Reset()
-		stringBuilderPool.Put(builder)
-	}()
-
-	builder.Grow(estimatedSize)
-
-	for path, fileContent := range sources {
-		builder.WriteString("// File: ")
-		builder.WriteString(path)
-		builder.WriteString("\n")
-		builder.WriteString(fileContent.Content)
-		builder.WriteString("\n\n")
+	// Fallback
+	for _, rawFile := range raw {
+		var file sourceFile
+		if err := json.Unmarshal(rawFile, &file); err == nil {
+			return file.Content
+		}
 	}
 
-	return builder.String()
+	return ""
+}
+
+func (c *EtherscanClient) isLibraryPath(path string) bool {
+	libraries := []string{
+		"@openzeppelin",
+		"@chainlink",
+		"@uniswap",
+		"node_modules",
+		"@gnosis",
+		"@aave",
+		"@compound",
+	}
+
+	pathLower := strings.ToLower(path)
+	for _, lib := range libraries {
+		if strings.Contains(pathLower, lib) {
+			return true
+		}
+	}
+	return false
 }

@@ -9,16 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -115,6 +106,47 @@ const docTemplate = `{
                 ],
                 "responses": {}
             }
+        },
+        "/static-analysis": {
+            "post": {
+                "description": "Performs static security analysis on Solidity source code using Slither",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "static-analysis"
+                ],
+                "summary": "Analyze Solidity contract for security vulnerabilities",
+                "parameters": [
+                    {
+                        "description": "Contract source code",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/static_analysis.AnalyzeRequest"
+                        }
+                    }
+                ],
+                "responses": {}
+            }
+        }
+    },
+    "definitions": {
+        "static_analysis.AnalyzeRequest": {
+            "type": "object",
+            "required": [
+                "source"
+            ],
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
         }
     }
 }`
@@ -126,7 +158,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http", "https"},
 	Title:            "Slyther Go Backend API",
-	Description:      "This is a sample server for Slyther Go Backend.",
+	Description:      "This is a server for Slyther Go Backend.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

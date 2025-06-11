@@ -1,38 +1,60 @@
 version: "3.8"
 
 services:
-  # app:
-  #   env_file:
-  #     - .env
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "${SERVER_PORT}:${SERVER_PORT}"
-  #   depends_on:
-  #     - postgres
-  #     - mongodb
-  #     - redis
-  #   environment:
-  #     # Server
-  #     - SERVER_PORT=${SERVER_PORT}
-  #     - SERVER_ENV=${SERVER_ENV}
+  app:
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    depends_on:
+      - postgres
+      - redis
+      - slither
+    environment:
+      # Server
+      - SERVER_PORT=${SERVER_PORT}
+      - SERVER_ENV=${SERVER_ENV}
 
-  #     # Database
-  #     - DB_HOST=${DB_HOST}
-  #     - DB_PORT=${DB_PORT}
-  #     - DB_USER=${DB_USER}
-  #     - DB_PASSWORD=${DB_PASSWORD}
-  #     - DB_NAME=${DB_NAME}
-  #     - DB_SSL_MODE=${DB_SSL_MODE}
+      # Database
+      - DB_HOST=postgres
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
 
-  #     # Redis
-  #     - REDIS_ADDR=${REDIS_ADDR}
-  #     - REDIS_PASSWORD=${REDIS_PASSWORD}
-  #     - REDIS_DB=${REDIS_DB}
-  #   networks:
-  #     - app-network
-  #   restart: unless-stopped
+      # Redis
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
+
+      # Slither
+      - SLITHER_CONTAINER_NAME=slither
+      - WORKSPACE_PATH=/workspace
+    networks:
+      - app-network
+      - slither-network
+    volumes:
+      - shared-workspace:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  slither:
+    build:
+      context: .
+      dockerfile: Dockerfile.slither
+    container_name: slither
+    networks:
+      - slither-network
+    volumes:
+      - shared-workspace:/workspace
+    command: tail -f /dev/null
+    environment:
+      - SOLC_VERSION=0.8.20
+    restart: unless-stopped
 
   postgres:
     image: postgres:17-alpine
@@ -61,7 +83,10 @@ services:
 networks:
   app-network:
     driver: bridge
+  slither-network:
+    driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
+  shared-workspace:

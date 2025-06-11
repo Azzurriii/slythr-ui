@@ -5,18 +5,9 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "This is a sample server for Slyther Go Backend.",
+        "description": "This is a server for Slyther Go Backend.",
         "title": "Slyther Go Backend API",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
+        "contact": {},
         "version": "1.0"
     },
     "host": "localhost:8080",
@@ -112,6 +103,47 @@
                     }
                 ],
                 "responses": {}
+            }
+        },
+        "/static-analysis": {
+            "post": {
+                "description": "Performs static security analysis on Solidity source code using Slither",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "static-analysis"
+                ],
+                "summary": "Analyze Solidity contract for security vulnerabilities",
+                "parameters": [
+                    {
+                        "description": "Contract source code",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/static_analysis.AnalyzeRequest"
+                        }
+                    }
+                ],
+                "responses": {}
+            }
+        }
+    },
+    "definitions": {
+        "static_analysis.AnalyzeRequest": {
+            "type": "object",
+            "required": [
+                "source"
+            ],
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "minLength": 1
+                }
             }
         }
     }

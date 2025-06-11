@@ -1,0 +1,53 @@
+# Dockerfile.slither
+FROM trailofbits/eth-security-toolbox:latest
+
+# Install additional dependencies
+RUN apt-get update && apt-get install -y \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install and configure solc-select
+RUN pip3 install solc-select
+
+# Install multiple Solidity versions
+RUN solc-select install 0.8.20 && \
+    solc-select install 0.8.19 && \
+    solc-select install 0.8.0 && \
+    solc-select install 0.7.6 && \
+    solc-select use 0.8.20
+
+# Set default SOLC version
+ENV SOLC_VERSION=0.8.20
+
+# Create workspace directory with proper permissions
+RUN mkdir -p /workspace && \
+    chmod 777 /workspace
+
+WORKDIR /workspace
+
+# Setup package.json with common dependencies
+RUN echo '{\
+  "name": "slither-analysis",\
+  "version": "1.0.0",\
+  "dependencies": {\
+    "@openzeppelin/contracts": "^4.9.0",\
+    "@openzeppelin/contracts-upgradeable": "^4.9.0",\
+    "@chainlink/contracts": "^0.6.1",\
+    "@uniswap/v2-core": "^1.0.1",\
+    "@uniswap/v3-core": "^1.0.0"\
+  }\
+}' > /workspace/package.json && \
+chmod 666 /workspace/package.json
+
+# Install npm dependencies
+RUN npm install && \
+    chmod -R 777 /workspace/node_modules
+
+# Create entrypoint to ensure solc is available
+RUN echo '#!/bin/bash\n\
+export PATH="/root/.solc-select/artifacts/solc-${SOLC_VERSION}:/root/.solc-select/artifacts:$PATH"\n\
+exec "$@"' > /entrypoint.sh && \
+chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,10 +1,15 @@
-.PHONY: build run test docker-build docker-run dev clean fmt lint vet staticcheck install-lint
+.PHONY: build run test docker-build docker-run dev clean fmt lint vet staticcheck install-lint depend-services
 
-APP_NAME=go-backend-template
+APP_NAME=slythr-go-backend
 
 build:
 	mkdir -p bin
 	go build -o bin/app cmd/api/main.go
+
+depend-services:
+	docker compose up -d slither
+	docker compose up -d postgres
+	docker compose up -d redis
 
 run:
 	if command -v air >/dev/null 2>&1; then air; else go run cmd/api/main.go; fi
