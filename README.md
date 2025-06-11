@@ -1,116 +1,95 @@
-# Go Backend Template
+# Slyther Go Backend
 
-A scalable backend boilerplate built with **Go**, **Gin**, **GORM**, **PostgreSQL**, and **Redis**.
+Slyther Go Backend is a smart contract analysis service built in Go. It provides both static and dynamic analysis capabilities for smart contracts, integrating with Etherscan and Large Language Models (LLMs).
 
-## 🚀 Features
+## Key Features
 
-- **RESTful API** using Gin
-- **PostgreSQL + Redis** integration
-- **Modular service-based architecture**
-- **Middleware support** (CORS, Logging)
-- **Graceful shutdown handling**
-- **Environment variable configuration**
+- Static smart contract analysis
+- Dynamic smart contract analysis
+- Etherscan integration for contract information
+- LLM integration for analysis results
+- RESTful API with Swagger documentation
+- Rate limiting and CORS middleware
+- Data persistence using GORM
 
----
+## System Requirements
 
-## 📌 Getting Started
+- Go 1.x
+- Docker and Docker Compose
+- PostgreSQL (or any GORM-compatible database)
 
-### Prerequisites
-
-Ensure you have the following installed:
-
-- [Go](https://go.dev/doc/install) (1.18+ recommended)
-- [PostgreSQL](https://www.postgresql.org/download/)
-- [Redis](https://redis.io/download/)
-
-### Installation
+## Installation
 
 1. Clone the repository:
 
-   ```bash
-   git clone https://github.com/Azzurriii/slythr-go-backend.git
-   cd go-backend-template
-   ```
-
-2. Create a `.env` file and configure database credentials:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Install dependencies:
-
-   ```bash
-   go mod tidy
-   ```
-
-4. Run the database migrations (if applicable):
-
-   ```bash
-   go run scripts/migrate.go
-   ```
-
-5. Start the server:
-
-   ```bash
-   go run main.go
-   ```
-
-   The server should be running at **http://localhost:8080**
-
----
-
-## 📂 Project Structure
-
-```
-├── config/          # Configuration files
-├── controllers/     # API Controllers
-├── models/         # Database Models
-├── routes/         # Route Handlers
-├── services/       # Business Logic Layer
-├── database/       # DB Connection & Migrations
-├── middleware/     # Middleware (CORS, Auth, Logging)
-├── templates/      # HTML Templates
-├── main.go         # Entry Point
-└── .env.example    # Environment Config Sample
+```bash
+git clone https://github.com/Azzurriii/slythr-go-backend.git
+cd slythr-backend
 ```
 
----
+2. Install dependencies:
 
-## 📡 API Endpoints
+```bash
+go mod download
+```
 
-| Method | Endpoint         | Description    |
-| ------ | ---------------- | -------------- |
-| GET    | `/api/users`     | Get all users  |
-| POST   | `/api/users`     | Create a user  |
-| GET    | `/api/users/:id` | Get user by ID |
-| PUT    | `/api/users/:id` | Update user    |
-| DELETE | `/api/users/:id` | Delete user    |
+3. Start services with Docker Compose:
 
----
+```bash
+docker-compose up -d
+```
 
-## 🛠 Technologies Used
+## Project Structure
 
-- **Go** - Core language
-- **Gin** - HTTP framework
-- **GORM** - ORM for PostgreSQL
-- **Redis** - In-memory caching
-- **Docker** - Containerization (optional)
+```
+.
+├── cmd/                  # Application entry points
+├── config/              # Application configuration
+├── docs/                # API documentation (Swagger)
+├── internal/            # Internal application code
+│   ├── application/     # Business logic
+│   ├── domain/         # Domain models and interfaces
+│   ├── infrastructure/ # External services implementations
+│   └── interface/      # HTTP handlers and routes
+├── pkg/                # Reusable packages
+└── scripts/            # Utility scripts
+```
 
----
+## Development
 
-## 📝 License
+1. Run the application in development mode:
 
-This project is licensed under the **MIT License**. Feel free to use and modify it as needed!
+```bash
+make run
+```
 
----
+2. Run tests:
 
-## 🤝 Contributing
+```bash
+make test
+```
 
-Contributions are welcome! If you find issues or have improvements, feel free to open an issue or PR.
+3. Generate Swagger documentation:
 
----
+```bash
+make swagger
+```
 
-### 🎯 Author
+## API Documentation
 
-Developed by **Hokam Singh** with ❤️. Connect on [GitHub](https://github.com/hokamsingh)!
+API documentation is automatically generated using Swagger and can be accessed at `/swagger/index.html` after starting the server.
+
+## Features in Detail
+
+### Smart Contract Analysis
+
+- Static Analysis: Code review and vulnerability detection
+- Dynamic Analysis: Runtime behavior analysis
+- Integration with popular blockchain networks
+
+### API Endpoints
+
+- Contract management
+- Analysis execution
+- Historical analysis results
+- LLM-powered insights
