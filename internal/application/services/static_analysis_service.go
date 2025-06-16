@@ -11,13 +11,18 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/static_analysis"
+	"github.com/Azzurriii/slythr-go-backend/pkg/logger"
 	"github.com/google/uuid"
 )
 
 type StaticAnalysisService struct {
 	slitherContainer string
 	workspacePath    string
+	logger           *logger.Logger
 }
 
 func NewStaticAnalysisService() *StaticAnalysisService {
@@ -34,11 +39,13 @@ func NewStaticAnalysisService() *StaticAnalysisService {
 	return &StaticAnalysisService{
 		slitherContainer: containerName,
 		workspacePath:    workspacePath,
+		logger:           logger.Default,
 	}
 }
 
 func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis.AnalyzeResponse, error) {
 	if !s.isContainerRunning() {
+		s.logger.Warnf("Slither analysis container is not running")
 		return &static_analysis.AnalyzeResponse{
 			Success: false,
 			Message: "Slither analysis container is not running. Please start the container first.",
@@ -46,9 +53,12 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 	}
 
 	analysisID := uuid.New().String()
+	s.logger.Infof("Starting static analysis with ID: %s", analysisID)
+
 	tempDir := filepath.Join(os.TempDir(), analysisID)
 
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		s.logger.Errorf("Failed to create temp directory: %v", err)
 		return &static_analysis.AnalyzeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to create temp directory: %v", err),
@@ -58,6 +68,7 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 
 	contractFile := filepath.Join(tempDir, "Contract.sol")
 	if err := os.WriteFile(contractFile, []byte(source), 0644); err != nil {
+		s.logger.Errorf("Failed to write contract file: %v", err)
 		return &static_analysis.AnalyzeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to write contract file: %v", err),
@@ -76,6 +87,7 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 		}
 	}`
 	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(packageJSON), 0644); err != nil {
+		s.logger.Errorf("Failed to write package.json: %v", err)
 		return &static_analysis.AnalyzeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to write package.json: %v", err),
@@ -84,6 +96,7 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 
 	copyCmd := exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.slitherContainer, s.workspacePath))
 	if err := copyCmd.Run(); err != nil {
+		s.logger.Errorf("Failed to copy files to container: %v", err)
 		return &static_analysis.AnalyzeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to copy files to container: %v", err),
@@ -91,17 +104,22 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 	}
 
 	containerPath := filepath.Join(s.workspacePath, analysisID)
+	s.logger.Infof("Installing dependencies in container path: %s", containerPath)
+
 	installCmd := exec.Command("docker", "exec", s.slitherContainer, "bash", "-c",
 		fmt.Sprintf("cd %s && npm install", containerPath))
 	if err := installCmd.Run(); err != nil {
+		s.logger.Errorf("Failed to install dependencies: %v", err)
 		return &static_analysis.AnalyzeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to install dependencies: %v", err),
 		}, err
 	}
 
+	s.logger.Infof("Running Slither analysis on contract")
 	slitherOutput, err := s.runSlitherInContainer(containerPath, "Contract.sol")
 	if err != nil {
+		s.logger.Errorf("Failed to run Slither: %v", err)
 		return &static_analysis.AnalyzeResponse{
 			Success:   false,
 			Message:   fmt.Sprintf("Failed to run Slither: %v", err),
@@ -110,6 +128,7 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 	}
 
 	issues := s.parseSlitherOutput(slitherOutput)
+	s.logger.Infof("Static analysis completed successfully, found %d issues", len(issues))
 
 	return &static_analysis.AnalyzeResponse{
 		Success:     true,
@@ -124,6 +143,7 @@ func (s *StaticAnalysisService) isContainerRunning() bool {
 	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", s.slitherContainer)
 	output, err := cmd.Output()
 	if err != nil {
+		s.logger.Errorf("Failed to check container status: %v", err)
 		return false
 	}
 	return strings.TrimSpace(string(output)) == "true"
@@ -253,7 +273,7 @@ func (s *StaticAnalysisService) parseTextOutput(output string) []static_analysis
 func (s *StaticAnalysisService) formatTitle(check string) string {
 	words := strings.Split(check, "-")
 	for i, word := range words {
-		words[i] = strings.Title(word)
+		words[i] = cases.Title(language.English).String(word)
 	}
 	return strings.Join(words, " ")
 }

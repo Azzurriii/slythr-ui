@@ -39,8 +39,3 @@ type DynamicAnalysisServiceInterface interface {
 	// GetAnalysisBySourceHash retrieves dynamic analysis by source hash
 	GetAnalysisBySourceHash(ctx context.Context, sourceHash string) (*entities.DynamicAnalysis, error)
 }
-
-// HashGenerator interface for generating hashes
-type HashGenerator interface {
-	GenerateSourceHash(sourceCode string) string
-}

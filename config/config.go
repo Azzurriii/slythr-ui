@@ -15,6 +15,7 @@ type Config struct {
 	SMTP      SMTPConfig
 	JWT       JWTConfig
 	Etherscan EtherscanConfig
+	Gemini    GeminiConfig
 }
 
 type ServerConfig struct {
@@ -51,6 +52,10 @@ type JWTConfig struct {
 }
 
 type EtherscanConfig struct {
+	APIKey string
+}
+
+type GeminiConfig struct {
 	APIKey string
 }
 
@@ -98,6 +103,9 @@ func LoadConfig() (*Config, error) {
 		},
 		Etherscan: EtherscanConfig{
 			APIKey: viper.GetString("ETHERSCAN_API_KEY"),
+		},
+		Gemini: GeminiConfig{
+			APIKey: viper.GetString("GEMINI_API_KEY"),
 		},
 	}
 

@@ -1,19 +1,13 @@
-package scripts
+package main
 
 import (
 	"log"
 
 	config "github.com/Azzurriii/slythr-go-backend/config"
+	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-// Define models for migration
-type User struct {
-	ID       uint   `gorm:"primaryKey"`
-	Email    string `gorm:"uniqueIndex"`
-	Password string
-}
 
 // Migrate function to run database migrations
 func Migrate() error {
@@ -31,8 +25,12 @@ func Migrate() error {
 		return err
 	}
 
-	// AutoMigrate runs the migration
-	if err := db.AutoMigrate(&User{}); err != nil {
+	// AutoMigrate runs the migration for all entities
+	if err := db.AutoMigrate(
+		&entities.Contract{},
+		&entities.StaticAnalysis{},
+		&entities.DynamicAnalysis{},
+	); err != nil {
 		log.Fatalf("Migration failed: %v", err)
 		return err
 	}

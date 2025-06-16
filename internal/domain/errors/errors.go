@@ -64,6 +64,8 @@ var (
 var (
 	ErrDynamicAnalysisNotFound = &DomainError{Code: ErrCodeDynamicAnalysisNotFound, Message: "dynamic analysis not found"}
 	ErrInvalidLLMResponse      = &DomainError{Code: ErrCodeInvalidLLMResponse, Message: "invalid LLM response"}
+	ErrAnalysisNotFound        = &DomainError{Code: ErrCodeDynamicAnalysisNotFound, Message: "analysis not found"}
+	ErrAnalysisAlreadyExists   = &DomainError{Code: ErrCodeContractAlreadyExists, Message: "analysis already exists"}
 )
 
 // ErrorResponse represents a standardized error response

@@ -10,6 +10,7 @@ import (
 
 	config "github.com/Azzurriii/slythr-go-backend/config"
 	_ "github.com/Azzurriii/slythr-go-backend/docs"
+	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
 	database "github.com/Azzurriii/slythr-go-backend/internal/infrastructure/database"
 	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/external"
 	gormRepo "github.com/Azzurriii/slythr-go-backend/internal/infrastructure/persistence/gorm"
@@ -45,15 +46,25 @@ func main() {
 
 	db := connectionManager.GetPostgres()
 
+	if err := db.AutoMigrate(
+		&entities.Contract{},
+		&entities.StaticAnalysis{},
+		&entities.DynamicAnalysis{},
+	); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
 	contractRepo := gormRepo.NewContractRepository(db)
+	dynamicAnalysisRepo := gormRepo.NewDynamicAnalysisRepository(db)
 
 	etherscanClient := external.NewEtherscanClient(&cfg.Etherscan)
 
 	routerDependencies := &routes.RouterDependencies{
-		ContractRepo:    contractRepo,
-		EtherscanClient: etherscanClient,
-		Logger:          logger.Default,
-		Config:          cfg,
+		ContractRepo:        contractRepo,
+		DynamicAnalysisRepo: dynamicAnalysisRepo,
+		EtherscanClient:     etherscanClient,
+		Logger:              logger.Default,
+		Config:              cfg,
 	}
 
 	router := routes.SetupRouter(routerDependencies)

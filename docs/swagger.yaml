@@ -1,12 +1,20 @@
 basePath: /api/v1
 definitions:
-  static_analysis.AnalyzeRequest:
+  dynamic_analysis.AnalyzeRequest:
     properties:
-      source:
+      source_code:
         minLength: 1
         type: string
     required:
-    - source
+    - source_code
+    type: object
+  static_analysis.AnalyzeRequest:
+    properties:
+      source_code:
+        minLength: 1
+        type: string
+    required:
+    - source_code
     type: object
 host: localhost:8080
 info:
@@ -87,6 +95,25 @@ paths:
       summary: Fetch contract source code
       tags:
       - contracts
+  /dynamic-analysis:
+    post:
+      consumes:
+      - application/json
+      description: Performs dynamic security analysis on Solidity source code using
+        Gemini LLM
+      parameters:
+      - description: Contract source code
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dynamic_analysis.AnalyzeRequest'
+      produces:
+      - application/json
+      responses: {}
+      summary: Analyze Solidity contract for security vulnerabilities using LLM
+      tags:
+      - dynamic-analysis
   /static-analysis:
     post:
       consumes:

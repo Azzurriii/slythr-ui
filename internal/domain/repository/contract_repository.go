@@ -20,6 +20,12 @@ type ContractRepository interface {
 	// FindBySourceHash retrieves contracts by source hash
 	FindBySourceHash(ctx context.Context, sourceHash string) ([]*entities.Contract, error)
 
+	// FindFirstBySourceHash retrieves the first contract by source hash
+	FindFirstBySourceHash(ctx context.Context, sourceHash string) (*entities.Contract, error)
+
+	// ExistsBySourceHash checks if a contract exists by source hash
+	ExistsBySourceHash(ctx context.Context, sourceHash string) (bool, error)
+
 	// UpdateContract updates an existing contract
 	UpdateContract(ctx context.Context, contract *entities.Contract) error
 

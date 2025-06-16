@@ -70,6 +70,35 @@ func (r *contractRepository) FindBySourceHash(ctx context.Context, sourceHash st
 	return contracts, nil
 }
 
+func (r *contractRepository) FindFirstBySourceHash(ctx context.Context, sourceHash string) (*entities.Contract, error) {
+	var contract entities.Contract
+	err := r.db.WithContext(ctx).
+		Where("source_hash = ?", sourceHash).
+		First(&contract).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domainerrors.ErrContractNotFound
+		}
+		return nil, fmt.Errorf("failed to find contract by source hash: %w", err)
+	}
+	return &contract, nil
+}
+
+func (r *contractRepository) ExistsBySourceHash(ctx context.Context, sourceHash string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&entities.Contract{}).
+		Where("source_hash = ?", sourceHash).
+		Count(&count).Error
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check contract existence by source hash: %w", err)
+	}
+
+	return count > 0, nil
+}
+
 func (r *contractRepository) UpdateContract(ctx context.Context, contract *entities.Contract) error {
 	result := r.db.WithContext(ctx).Save(contract)
 	if result.Error != nil {

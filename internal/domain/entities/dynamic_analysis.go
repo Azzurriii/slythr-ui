@@ -4,26 +4,24 @@ import (
 	"time"
 
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/valueobjects"
+	"gorm.io/gorm"
 )
 
 // DynamicAnalysis represents a dynamic analysis result with LLM response in the domain
 type DynamicAnalysis struct {
 	ID          DynamicAnalysisID `gorm:"primaryKey" json:"id"`
-	ContractID  ContractID        `gorm:"not null;index" json:"contract_id"`
 	SourceHash  string            `gorm:"not null;size:64;index" json:"source_hash"`
 	LLMResponse string            `gorm:"type:text;not null" json:"llm_response"`
 	CreatedAt   time.Time         `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
-
-	// Relations
-	Contract *Contract `gorm:"foreignKey:ContractID" json:"contract,omitempty"`
+	DeletedAt   gorm.DeletedAt    `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 // DynamicAnalysisID represents the unique identifier for a dynamic analysis
 type DynamicAnalysisID uint
 
 // NewDynamicAnalysis creates a new dynamic analysis with validation
-func NewDynamicAnalysis(contractID uint, sourceHash, llmResponse string) (*DynamicAnalysis, error) {
+func NewDynamicAnalysis(sourceHash, llmResponse string) (*DynamicAnalysis, error) {
 	// Validate source hash
 	sourceHashVO, err := valueobjects.NewSourceHash(sourceHash)
 	if err != nil {
@@ -37,7 +35,6 @@ func NewDynamicAnalysis(contractID uint, sourceHash, llmResponse string) (*Dynam
 	}
 
 	return &DynamicAnalysis{
-		ContractID:  ContractID(contractID),
 		SourceHash:  sourceHashVO.Value(),
 		LLMResponse: llmResponseVO.Value(),
 	}, nil
@@ -46,11 +43,6 @@ func NewDynamicAnalysis(contractID uint, sourceHash, llmResponse string) (*Dynam
 // GetID returns the dynamic analysis ID
 func (d *DynamicAnalysis) GetID() DynamicAnalysisID {
 	return d.ID
-}
-
-// GetContractID returns the contract ID
-func (d *DynamicAnalysis) GetContractID() ContractID {
-	return d.ContractID
 }
 
 // GetSourceHash returns the source hash as value object
@@ -67,10 +59,6 @@ func (d *DynamicAnalysis) GetLLMResponse() valueobjects.LLMResponse {
 
 // IsValid checks if the dynamic analysis is valid
 func (d *DynamicAnalysis) IsValid() bool {
-	if d.ContractID == 0 {
-		return false
-	}
-
 	sourceHash, err := valueobjects.NewSourceHash(d.SourceHash)
 	if err != nil {
 		return false
@@ -92,5 +80,5 @@ func (d *DynamicAnalysis) HasResponse() bool {
 
 // TableName returns the table name for GORM
 func (DynamicAnalysis) TableName() string {
-	return "dynamic_analyses"
+	return "dynamic_analysis"
 }

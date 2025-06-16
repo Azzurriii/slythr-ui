@@ -1,5 +1,5 @@
 package static_analysis
 
 type AnalyzeRequest struct {
-	Source string `json:"source" binding:"required" validate:"required,min=1"`
+	SourceCode string `json:"source_code" binding:"required" validate:"required,min=1"`
 }

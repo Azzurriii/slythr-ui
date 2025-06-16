@@ -3,6 +3,7 @@ package routes
 import (
 	config "github.com/Azzurriii/slythr-go-backend/config"
 	contractHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/contracts"
+	dynamicAnalysisHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/dynamic_analysis"
 	staticAnalysisHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/static_analysis"
 	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
@@ -19,10 +20,11 @@ type Logger interface {
 }
 
 type RouterDependencies struct {
-	ContractRepo    repository.ContractRepository
-	EtherscanClient external.EtherscanService
-	Logger          Logger
-	Config          *config.Config
+	ContractRepo        repository.ContractRepository
+	DynamicAnalysisRepo repository.DynamicAnalysisRepository
+	EtherscanClient     external.EtherscanService
+	Logger              Logger
+	Config              *config.Config
 }
 
 func SetupRouter(deps *RouterDependencies) *gin.Engine {
@@ -35,22 +37,33 @@ func SetupRouter(deps *RouterDependencies) *gin.Engine {
 	contractService := services.NewContractService(
 		deps.ContractRepo,
 		deps.EtherscanClient,
-		deps.Logger,
 	)
 
+	dynamicAnalysisService, err := services.NewDynamicAnalysisService(
+		deps.DynamicAnalysisRepo,
+		deps.ContractRepo,
+		nil, // Use default options
+	)
+	if err != nil {
+		panic("Failed to create dynamic analysis service: " + err.Error())
+	}
+
+	// Create handlers
 	contractHandler := contractHandlers.NewContractHandler(contractService)
 	staticAnalysisHandler := staticAnalysisHandlers.NewStaticAnalysisHandler()
+	dynamicAnalysisHandler := dynamicAnalysisHandlers.NewDynamicAnalysisHandler(dynamicAnalysisService)
 
-	setupAPIRoutes(r, contractHandler, staticAnalysisHandler)
+	setupAPIRoutes(r, contractHandler, staticAnalysisHandler, dynamicAnalysisHandler)
 
 	return r
 }
 
-func setupAPIRoutes(router *gin.Engine, contractHandler *contractHandlers.ContractHandler, staticAnalysisHandler *staticAnalysisHandlers.StaticAnalysisHandler) {
+func setupAPIRoutes(router *gin.Engine, contractHandler *contractHandlers.ContractHandler, staticAnalysisHandler *staticAnalysisHandlers.StaticAnalysisHandler, dynamicAnalysisHandler *dynamicAnalysisHandlers.DynamicAnalysisHandler) {
 	apiV1 := router.Group("/api/v1")
 	{
 		setupContractRoutes(apiV1, contractHandler)
 		setupStaticAnalysisRoutes(apiV1, staticAnalysisHandler)
+		setupDynamicAnalysisRoutes(apiV1, dynamicAnalysisHandler)
 	}
 }
 
@@ -64,6 +77,10 @@ func setupContractRoutes(group *gin.RouterGroup, handler *contractHandlers.Contr
 
 func setupStaticAnalysisRoutes(group *gin.RouterGroup, handler *staticAnalysisHandlers.StaticAnalysisHandler) {
 	group.POST("/static-analysis", handler.AnalyzeContract)
+}
+
+func setupDynamicAnalysisRoutes(group *gin.RouterGroup, handler *dynamicAnalysisHandlers.DynamicAnalysisHandler) {
+	group.POST("/dynamic-analysis", handler.AnalyzeContract)
 }
 
 func SetupRouterLegacy(repo repository.ContractRepository, cfg *config.Config, etherscanClient external.EtherscanService, logger Logger) *gin.Engine {

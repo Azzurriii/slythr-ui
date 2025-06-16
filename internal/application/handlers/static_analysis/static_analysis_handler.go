@@ -39,7 +39,7 @@ func (h *StaticAnalysisHandler) AnalyzeContract(c *gin.Context) {
 	}
 
 	// Validate source code is not empty
-	if len(req.Source) == 0 {
+	if len(req.SourceCode) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "Source code cannot be empty",
@@ -48,7 +48,7 @@ func (h *StaticAnalysisHandler) AnalyzeContract(c *gin.Context) {
 	}
 
 	// Perform static analysis
-	result, err := h.staticAnalysisService.AnalyzeContract(req.Source)
+	result, err := h.staticAnalysisService.AnalyzeContract(req.SourceCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
