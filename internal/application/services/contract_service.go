@@ -21,6 +21,11 @@ type ContractService struct {
 	cache  *cache.ContractCache
 }
 
+type ContractServiceInterface interface {
+	FetchContractSourceCode(ctx context.Context, req *contracts.GetContractSourceCodeRequest) (*contracts.GetContractSourceCodeResponse, error)
+	GetContractByAddressAndNetwork(ctx context.Context, address, network string) (*contracts.ContractResponse, error)
+}
+
 func NewContractService(repo repository.ContractRepository, client external.EtherscanService) ContractServiceInterface {
 	cfg, _ := config.LoadConfig()
 
