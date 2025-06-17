@@ -1,4 +1,4 @@
-# Slythr - Solidity Contract Analyze
+# Slythr - Solidity Contract Analyzer
 
 This repository contains the backend service for Slythr, a comprehensive smart contract analysis platform. Built with Go, it provides a robust API for performing static and dynamic security analysis on Solidity source code. The system is designed with a Clean Architecture approach to ensure maintainability, scalability, and separation of concerns.
 
