@@ -109,7 +109,7 @@ const docTemplate = `{
         },
         "/dynamic-analysis": {
             "post": {
-                "description": "Performs dynamic security analysis on Solidity source code using Gemini LLM",
+                "description": "Performs dynamic security analysis on Solidity source code using AI/LLM",
                 "consumes": [
                     "application/json"
                 ],
@@ -119,7 +119,7 @@ const docTemplate = `{
                 "tags": [
                     "dynamic-analysis"
                 ],
-                "summary": "Analyze Solidity contract for security vulnerabilities using LLM",
+                "summary": "Analyze Solidity contract using AI for security vulnerabilities",
                 "parameters": [
                     {
                         "description": "Contract source code",
@@ -127,7 +127,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dynamic_analysis.AnalyzeRequest"
+                            "$ref": "#/definitions/analysis.AnalyzeRequest"
                         }
                     }
                 ],
@@ -154,7 +154,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/static_analysis.AnalyzeRequest"
+                            "$ref": "#/definitions/analysis.AnalyzeRequest"
                         }
                     }
                 ],
@@ -163,19 +163,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dynamic_analysis.AnalyzeRequest": {
-            "type": "object",
-            "required": [
-                "source_code"
-            ],
-            "properties": {
-                "source_code": {
-                    "type": "string",
-                    "minLength": 1
-                }
-            }
-        },
-        "static_analysis.AnalyzeRequest": {
+        "analysis.AnalyzeRequest": {
             "type": "object",
             "required": [
                 "source_code"

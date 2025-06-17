@@ -25,7 +25,7 @@ func NewStaticAnalysisHandler(service *services.StaticAnalysisService) *StaticAn
 // @Tags static-analysis
 // @Accept json
 // @Produce json
-// @Param request body static_analysis.AnalyzeRequest true "Contract source code"
+// @Param request body analysis.AnalyzeRequest true "Contract source code"
 // @Router /static-analysis [post]
 func (h *StaticAnalysisHandler) AnalyzeContract(c *gin.Context) {
 	var req analysis.AnalyzeRequest

@@ -25,7 +25,7 @@ func NewDynamicAnalysisHandler(service *services.DynamicAnalysisService) *Dynami
 // @Tags dynamic-analysis
 // @Accept json
 // @Produce json
-// @Param request body dynamic_analysis.AnalyzeRequest true "Contract source code"
+// @Param request body analysis.AnalyzeRequest true "Contract source code"
 // @Router /dynamic-analysis [post]
 func (h *DynamicAnalysisHandler) AnalyzeContract(c *gin.Context) {
 	var req analysis.AnalyzeRequest
