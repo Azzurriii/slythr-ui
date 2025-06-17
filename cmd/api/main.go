@@ -56,12 +56,14 @@ func main() {
 
 	contractRepo := gormRepo.NewContractRepository(db)
 	dynamicAnalysisRepo := gormRepo.NewDynamicAnalysisRepository(db)
+	staticAnalysisRepo := gormRepo.NewStaticAnalysisRepository(db)
 
 	etherscanClient := external.NewEtherscanClient(&cfg.Etherscan)
 
 	routerDependencies := &routes.RouterDependencies{
 		ContractRepo:        contractRepo,
 		DynamicAnalysisRepo: dynamicAnalysisRepo,
+		StaticAnalysisRepo:  staticAnalysisRepo,
 		EtherscanClient:     etherscanClient,
 		Logger:              logger.Default,
 		Config:              cfg,

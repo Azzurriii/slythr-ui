@@ -14,68 +14,164 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/static_analysis"
+	config "github.com/Azzurriii/slythr-go-backend/config"
+	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/analysis"
+	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
+	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/cache"
 	"github.com/Azzurriii/slythr-go-backend/pkg/logger"
+	"github.com/Azzurriii/slythr-go-backend/pkg/utils"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
+)
+
+const (
+	defaultContainerName = "slither"
+	defaultWorkspacePath = "/workspace"
+	analysisTimeout      = 5 * time.Minute
+	maxDescriptionLength = 200
 )
 
 type StaticAnalysisService struct {
-	slitherContainer string
-	workspacePath    string
-	logger           *logger.Logger
+	containerName string
+	workspacePath string
+	logger        *logger.Logger
+	cache         *cache.Cache
 }
 
-func NewStaticAnalysisService() *StaticAnalysisService {
-	containerName := os.Getenv("SLITHER_CONTAINER_NAME")
-	if containerName == "" {
-		containerName = "slither"
+type StaticAnalysisServiceOptions struct {
+	AnalysisTimeout time.Duration
+	ContainerName   string
+	WorkspacePath   string
+}
+
+func NewStaticAnalysisService(
+	staticAnalysisRepo repository.StaticAnalysisRepository,
+	opts *StaticAnalysisServiceOptions,
+) (*StaticAnalysisService, error) {
+	// Set default options
+	containerName := defaultContainerName
+	workspacePath := defaultWorkspacePath
+
+	if opts != nil {
+		if opts.ContainerName != "" {
+			containerName = opts.ContainerName
+		}
+		if opts.WorkspacePath != "" {
+			workspacePath = opts.WorkspacePath
+		}
 	}
 
-	workspacePath := os.Getenv("WORKSPACE_PATH")
-	if workspacePath == "" {
-		workspacePath = "/workspace"
+	// Override with environment variables if set
+	if envContainer := os.Getenv("SLITHER_CONTAINER_NAME"); envContainer != "" {
+		containerName = envContainer
+	}
+	if envWorkspace := os.Getenv("WORKSPACE_PATH"); envWorkspace != "" {
+		workspacePath = envWorkspace
+	}
+
+	// Setup cache
+	var analysisCache *cache.Cache
+	cfg, err := config.LoadConfig()
+	if err == nil {
+		var redisClient *redis.Client
+		if cfg.Redis.Addr != "" {
+			redisClient = redis.NewClient(&redis.Options{
+				Addr:     cfg.Redis.Addr,
+				Password: cfg.Redis.Password,
+				DB:       cfg.Redis.DB,
+			})
+		}
+
+		analysisCache = cache.NewCache(redisClient, nil, nil, staticAnalysisRepo)
 	}
 
 	return &StaticAnalysisService{
-		slitherContainer: containerName,
-		workspacePath:    workspacePath,
-		logger:           logger.Default,
-	}
+		containerName: containerName,
+		workspacePath: workspacePath,
+		logger:        logger.Default,
+		cache:         analysisCache,
+	}, nil
 }
 
-func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis.AnalyzeResponse, error) {
+func (s *StaticAnalysisService) AnalyzeContract(ctx context.Context, source string) (*analysis.StaticAnalysisResponse, error) {
 	if !s.isContainerRunning() {
-		s.logger.Warnf("Slither analysis container is not running")
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: "Slither analysis container is not running. Please start the container first.",
-		}, fmt.Errorf("slither container not running")
+		return s.errorResponse("Slither analysis container is not running. Please start the container first."),
+			fmt.Errorf("slither container not running")
+	}
+
+	// Check cache first
+	sourceHash := utils.GenerateSourceHash(source)
+	if s.cache != nil {
+		if cached, err := s.cache.GetStaticAnalysis(ctx, sourceHash); err == nil && cached != nil {
+			s.logger.Infof("Returning cached static analysis for source hash: %s", sourceHash)
+			return cached, nil
+		}
 	}
 
 	analysisID := uuid.New().String()
-	s.logger.Infof("Starting static analysis with ID: %s", analysisID)
+	s.logger.Infof("Starting static analysis with ID: %s, source hash: %s", analysisID, sourceHash)
 
-	tempDir := filepath.Join(os.TempDir(), analysisID)
-
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		s.logger.Errorf("Failed to create temp directory: %v", err)
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to create temp directory: %v", err),
-		}, err
+	// Setup workspace
+	tempDir, err := s.setupWorkspace(analysisID, source)
+	if err != nil {
+		return s.errorResponse(fmt.Sprintf("Failed to setup workspace: %v", err)), err
 	}
 	defer os.RemoveAll(tempDir)
 
-	contractFile := filepath.Join(tempDir, "Contract.sol")
-	if err := os.WriteFile(contractFile, []byte(source), 0644); err != nil {
-		s.logger.Errorf("Failed to write contract file: %v", err)
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to write contract file: %v", err),
-		}, err
+	// Copy to container and install dependencies
+	containerPath := filepath.Join(s.workspacePath, analysisID)
+	if err := s.prepareContainer(tempDir, containerPath); err != nil {
+		return s.errorResponse(fmt.Sprintf("Failed to prepare container: %v", err)), err
 	}
 
-	packageJSON := `{
+	// Run analysis
+	slitherOutput, err := s.runSlitherAnalysis(containerPath)
+	if err != nil {
+		return s.errorResponse(fmt.Sprintf("Failed to run Slither: %v", err)), err
+	}
+
+	// Parse and return results
+	response := s.buildSuccessResponse(slitherOutput)
+
+	// Cache the result
+	if s.cache != nil {
+		go s.cache.SetStaticAnalysis(context.Background(), sourceHash, response)
+	}
+
+	return response, nil
+}
+
+func (s *StaticAnalysisService) errorResponse(message string) *analysis.StaticAnalysisResponse {
+	return &analysis.StaticAnalysisResponse{
+		Success: false,
+		Message: message,
+	}
+}
+
+func (s *StaticAnalysisService) setupWorkspace(analysisID, source string) (string, error) {
+	tempDir := filepath.Join(os.TempDir(), analysisID)
+
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %v", err)
+	}
+
+	// Write contract file
+	contractFile := filepath.Join(tempDir, "Contract.sol")
+	if err := os.WriteFile(contractFile, []byte(source), 0644); err != nil {
+		return "", fmt.Errorf("failed to write contract file: %v", err)
+	}
+
+	// Write package.json
+	packageJSON := s.getPackageJSON()
+	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(packageJSON), 0644); err != nil {
+		return "", fmt.Errorf("failed to write package.json: %v", err)
+	}
+
+	return tempDir, nil
+}
+
+func (s *StaticAnalysisService) getPackageJSON() string {
+	return `{
 		"name": "slither-analysis",
 		"version": "1.0.0",
 		"dependencies": {
@@ -86,64 +182,52 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 			"@uniswap/v3-core": "^1.0.0"
 		}
 	}`
-	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(packageJSON), 0644); err != nil {
-		s.logger.Errorf("Failed to write package.json: %v", err)
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to write package.json: %v", err),
-		}, err
-	}
+}
 
-	copyCmd := exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.slitherContainer, s.workspacePath))
+func (s *StaticAnalysisService) prepareContainer(tempDir, containerPath string) error {
+	// Copy files to container
+	copyCmd := exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.containerName, s.workspacePath))
 	if err := copyCmd.Run(); err != nil {
-		s.logger.Errorf("Failed to copy files to container: %v", err)
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to copy files to container: %v", err),
-		}, err
+		return fmt.Errorf("failed to copy files to container: %v", err)
 	}
 
-	containerPath := filepath.Join(s.workspacePath, analysisID)
-	s.logger.Infof("Installing dependencies in container path: %s", containerPath)
-
-	installCmd := exec.Command("docker", "exec", s.slitherContainer, "bash", "-c",
+	// Install dependencies
+	installCmd := exec.Command("docker", "exec", s.containerName, "bash", "-c",
 		fmt.Sprintf("cd %s && npm install", containerPath))
 	if err := installCmd.Run(); err != nil {
-		s.logger.Errorf("Failed to install dependencies: %v", err)
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to install dependencies: %v", err),
-		}, err
+		return fmt.Errorf("failed to install dependencies: %v", err)
 	}
 
-	s.logger.Infof("Running Slither analysis on contract")
-	slitherOutput, err := s.runSlitherInContainer(containerPath, "Contract.sol")
+	return nil
+}
+
+func (s *StaticAnalysisService) runSlitherAnalysis(containerPath string) (string, error) {
+	solcVersion, err := s.detectSolidityVersion(containerPath, "Contract.sol")
 	if err != nil {
-		s.logger.Errorf("Failed to run Slither: %v", err)
-		return &static_analysis.AnalyzeResponse{
-			Success: false,
-			Message: fmt.Sprintf("Failed to run Slither: %v", err),
-		}, err
+		s.logger.Warnf("Failed to detect Solidity version, using default: %v", err)
+		solcVersion = "0.8.20"
 	}
 
-	issues := s.parseSlitherOutput(slitherOutput)
-	s.logger.Infof("Static analysis completed successfully, found %d issues", len(issues))
+	return s.runSlitherInContainer(containerPath, "Contract.sol", solcVersion)
+}
 
+func (s *StaticAnalysisService) buildSuccessResponse(slitherOutput string) *analysis.StaticAnalysisResponse {
+	issues := s.parseSlitherOutput(slitherOutput)
 	severitySummary := s.calculateSeveritySummary(issues)
 
-	response := &static_analysis.AnalyzeResponse{
+	s.logger.Infof("Static analysis completed successfully, found %d issues", len(issues))
+
+	return &analysis.StaticAnalysisResponse{
 		Success:         true,
 		Issues:          issues,
 		TotalIssues:     len(issues),
 		SeveritySummary: severitySummary,
 		AnalyzedAt:      time.Now(),
 	}
-
-	return response, nil
 }
 
 func (s *StaticAnalysisService) isContainerRunning() bool {
-	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", s.slitherContainer)
+	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", s.containerName)
 	output, err := cmd.Output()
 	if err != nil {
 		s.logger.Errorf("Failed to check container status: %v", err)
@@ -152,16 +236,9 @@ func (s *StaticAnalysisService) isContainerRunning() bool {
 	return strings.TrimSpace(string(output)) == "true"
 }
 
-func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile, solcVersion string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), analysisTimeout)
 	defer cancel()
-
-	// Detect Solidity version từ contract source
-	solcVersion, err := s.detectSolidityVersion(analysisDir, contractFile)
-	if err != nil {
-		s.logger.Warnf("Failed to detect Solidity version, using default: %v", err)
-		solcVersion = "0.8.20" // fallback
-	}
 
 	// Build Slither command với --solc-solcs-select flag
 	slitherCmd := fmt.Sprintf(
@@ -174,13 +251,13 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile 
 	s.logger.Infof("Executing Slither command: %s", slitherCmd)
 
 	// Execute in container
-	cmd := exec.CommandContext(ctx, "docker", "exec", s.slitherContainer, "bash", "-c", slitherCmd)
+	cmd := exec.CommandContext(ctx, "docker", "exec", s.containerName, "bash", "-c", slitherCmd)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 
 	output := stdout.String()
 	errorOutput := stderr.String()
@@ -188,15 +265,11 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile 
 	s.logger.Infof("Slither stdout: %s", output)
 	s.logger.Infof("Slither stderr: %s", errorOutput)
 
-	// Return stderr nếu stdout trống
 	if output == "" && errorOutput != "" {
 		output = errorOutput
 	}
 
-	// Slither trả về exit code 255 khi có findings - đây KHÔNG phải lỗi
-	// Chỉ return error nếu không có output hoặc có stderr mà không có stdout
 	if err != nil {
-		// Kiểm tra nếu có JSON output hợp lệ thì coi như success
 		if output != "" && (strings.Contains(output, `"success": true`) || strings.Contains(output, `"results"`)) {
 			s.logger.Infof("Slither completed with findings (exit code %v), parsing results", err)
 			return output, nil
@@ -210,7 +283,7 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile 
 }
 
 func (s *StaticAnalysisService) detectSolidityVersion(analysisDir, contractFile string) (string, error) {
-	readCmd := exec.Command("docker", "exec", s.slitherContainer, "cat", filepath.Join(analysisDir, contractFile))
+	readCmd := exec.Command("docker", "exec", s.containerName, "cat", filepath.Join(analysisDir, contractFile))
 	output, err := readCmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to read contract file: %v", err)
@@ -234,43 +307,47 @@ func (s *StaticAnalysisService) detectSolidityVersion(analysisDir, contractFile 
 }
 
 func (s *StaticAnalysisService) extractVersionFromPragma(pragma string) string {
-	pragma = strings.TrimPrefix(pragma, "pragma solidity")
-	pragma = strings.TrimSpace(pragma)
+	// Clean pragma statement
+	pragma = strings.TrimSpace(strings.TrimPrefix(pragma, "pragma solidity"))
 	pragma = strings.TrimSuffix(pragma, ";")
 	pragma = strings.TrimSpace(pragma)
 
-	if strings.HasPrefix(pragma, "^") {
-		if strings.HasPrefix(pragma, "^0.8") {
-			return "0.8.20"
-		} else if strings.HasPrefix(pragma, "^0.7") {
-			return "0.7.6"
-		} else if strings.HasPrefix(pragma, "^0.6") {
-			return "0.6.12"
-		} else if strings.HasPrefix(pragma, "^0.5") {
-			return "0.5.16"
-		}
-	} else if strings.HasPrefix(pragma, ">=") {
-		if strings.Contains(pragma, "0.8") {
-			return "0.8.20"
-		} else if strings.Contains(pragma, "0.7") {
-			return "0.7.6"
-		}
-	} else {
-		version := strings.Fields(pragma)[0]
-		if len(version) > 0 && (version[0] >= '0' && version[0] <= '9') {
+	// Version mapping for common patterns
+	versionMap := map[string]string{
+		"^0.8": "0.8.20",
+		"^0.7": "0.7.6",
+		"^0.6": "0.6.12",
+		"^0.5": "0.5.16",
+	}
+
+	// Check for caret versions
+	for prefix, version := range versionMap {
+		if strings.HasPrefix(pragma, prefix) {
 			return version
 		}
 	}
 
-	return "0.8.20"
+	// Check for range versions (>=)
+	if strings.HasPrefix(pragma, ">=") {
+		if strings.Contains(pragma, "0.8") {
+			return "0.8.20"
+		}
+		if strings.Contains(pragma, "0.7") {
+			return "0.7.6"
+		}
+	}
+
+	// Check for exact version
+	if len(pragma) > 0 && pragma[0] >= '0' && pragma[0] <= '9' {
+		return strings.Fields(pragma)[0]
+	}
+
+	return "0.8.20" // fallback
 }
 
-func (s *StaticAnalysisService) parseSlitherOutput(output string) []static_analysis.SlitherIssue {
-	var issues []static_analysis.SlitherIssue
-
+func (s *StaticAnalysisService) parseSlitherOutput(output string) []analysis.SlitherIssue {
 	var slitherResult struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error"`
+		Success bool `json:"success"`
 		Results struct {
 			Detectors []struct {
 				Check       string `json:"check"`
@@ -278,10 +355,8 @@ func (s *StaticAnalysisService) parseSlitherOutput(output string) []static_analy
 				Confidence  string `json:"confidence"`
 				Description string `json:"description"`
 				Elements    []struct {
-					Name          string `json:"name"`
 					SourceMapping struct {
-						Filename string `json:"filename"`
-						Lines    []int  `json:"lines"`
+						Lines []int `json:"lines"`
 					} `json:"source_mapping"`
 				} `json:"elements"`
 				Reference string `json:"first_markdown_element"`
@@ -289,78 +364,61 @@ func (s *StaticAnalysisService) parseSlitherOutput(output string) []static_analy
 		} `json:"results"`
 	}
 
-	if err := json.Unmarshal([]byte(output), &slitherResult); err == nil && slitherResult.Success {
-		for _, detector := range slitherResult.Results.Detectors {
-			issue := static_analysis.SlitherIssue{
-				Type:        "detector",
-				Title:       s.formatTitle(detector.Check),
-				Description: s.cleanDescription(detector.Description),
-				Severity:    strings.ToUpper(detector.Impact),
-				Confidence:  detector.Confidence,
-				Reference:   detector.Reference,
-			}
+	if err := json.Unmarshal([]byte(output), &slitherResult); err != nil || !slitherResult.Success {
+		s.logger.Warnf("Failed to parse Slither JSON output: %v", err)
+		return []analysis.SlitherIssue{}
+	}
 
-			// Format location đẹp hơn
-			if len(detector.Elements) > 0 {
-				element := detector.Elements[0]
-				if len(element.SourceMapping.Lines) > 0 {
-					line := element.SourceMapping.Lines[0]
-					if len(element.SourceMapping.Lines) > 1 {
-						lastLine := element.SourceMapping.Lines[len(element.SourceMapping.Lines)-1]
-						if lastLine != line {
-							issue.Location = fmt.Sprintf("Contract.sol:L%d-L%d", line, lastLine)
-						} else {
-							issue.Location = fmt.Sprintf("Contract.sol:L%d", line)
-						}
-					} else {
-						issue.Location = fmt.Sprintf("Contract.sol:L%d", line)
-					}
-				}
-			}
+	issues := make([]analysis.SlitherIssue, 0, len(slitherResult.Results.Detectors))
 
-			issues = append(issues, issue)
+	for _, detector := range slitherResult.Results.Detectors {
+		issue := analysis.SlitherIssue{
+			Type:        "detector",
+			Title:       s.formatTitle(detector.Check),
+			Description: s.cleanDescription(detector.Description),
+			Severity:    strings.ToUpper(detector.Impact),
+			Confidence:  detector.Confidence,
+			Reference:   detector.Reference,
+			Location:    s.formatLocation(detector.Elements),
 		}
-	} else {
-		issues = s.parseTextOutput(output)
+		issues = append(issues, issue)
 	}
 
 	return issues
 }
 
-func (s *StaticAnalysisService) parseTextOutput(output string) []static_analysis.SlitherIssue {
-	var issues []static_analysis.SlitherIssue
-	lines := strings.Split(output, "\n")
-
-	var currentIssue *static_analysis.SlitherIssue
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		if strings.Contains(line, "INFO:Detectors:") {
-			if currentIssue != nil {
-				issues = append(issues, *currentIssue)
-			}
-
-			description := strings.TrimPrefix(line, "INFO:Detectors:")
-			currentIssue = &static_analysis.SlitherIssue{
-				Type:        "detector",
-				Description: strings.TrimSpace(description),
-				Severity:    s.extractSeverity(line),
-			}
-			currentIssue.Title = s.extractTitle(currentIssue.Description)
-		} else if strings.HasPrefix(line, "Reference:") && currentIssue != nil {
-			currentIssue.Reference = strings.TrimSpace(strings.TrimPrefix(line, "Reference:"))
-		}
+func (s *StaticAnalysisService) formatLocation(elements []struct {
+	SourceMapping struct {
+		Lines []int `json:"lines"`
+	} `json:"source_mapping"`
+}) string {
+	if len(elements) == 0 || len(elements[0].SourceMapping.Lines) == 0 {
+		return ""
 	}
 
-	if currentIssue != nil {
-		issues = append(issues, *currentIssue)
+	lines := elements[0].SourceMapping.Lines
+	if len(lines) == 1 {
+		return fmt.Sprintf("Contract.sol:L%d", lines[0])
 	}
 
-	return issues
+	if lines[0] == lines[len(lines)-1] {
+		return fmt.Sprintf("Contract.sol:L%d", lines[0])
+	}
+
+	return fmt.Sprintf("Contract.sol:L%d-L%d", lines[0], lines[len(lines)-1])
+}
+
+func (s *StaticAnalysisService) cleanDescription(description string) string {
+	// Single pass cleaning
+	cleaned := strings.ReplaceAll(description, "\\n", " ")
+	cleaned = strings.ReplaceAll(cleaned, "\\t", " ")
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+
+	if len(cleaned) > maxDescriptionLength {
+		cleaned = cleaned[:maxDescriptionLength-3] + "..."
+	}
+
+	return cleaned
 }
 
 func (s *StaticAnalysisService) formatTitle(check string) string {
@@ -371,52 +429,29 @@ func (s *StaticAnalysisService) formatTitle(check string) string {
 	return strings.Join(words, " ")
 }
 
-func (s *StaticAnalysisService) cleanDescription(description string) string {
-	// Bỏ các ký tự xuống dòng và tab không cần thiết
-	cleaned := strings.ReplaceAll(description, "\\n", " ")
-	cleaned = strings.ReplaceAll(cleaned, "\\t", " ")
+func (s *StaticAnalysisService) calculateSeveritySummary(issues []analysis.SlitherIssue) analysis.SeveritySummary {
+	summary := analysis.SeveritySummary{}
 
-	// Bỏ khoảng trắng thừa
-	cleaned = strings.Join(strings.Fields(cleaned), " ")
-
-	// Giới hạn độ dài nếu quá dài
-	if len(cleaned) > 200 {
-		cleaned = cleaned[:197] + "..."
-	}
-
-	return strings.TrimSpace(cleaned)
-}
-
-func (s *StaticAnalysisService) extractTitle(description string) string {
-	parts := strings.SplitN(description, ".", 2)
-	if len(parts) > 0 {
-		title := strings.TrimSpace(parts[0])
-		if len(title) > 100 {
-			title = title[:100] + "..."
+	for _, issue := range issues {
+		switch strings.ToUpper(issue.Severity) {
+		case "HIGH":
+			summary.High++
+		case "MEDIUM":
+			summary.Medium++
+		case "LOW":
+			summary.Low++
+		default:
+			summary.Informational++
 		}
-		return title
 	}
-	return "Security Issue"
-}
 
-func (s *StaticAnalysisService) extractSeverity(line string) string {
-	line = strings.ToLower(line)
-	if strings.Contains(line, "high") || strings.Contains(line, "reentrancy") {
-		return "HIGH"
-	}
-	if strings.Contains(line, "medium") || strings.Contains(line, "timestamp") {
-		return "MEDIUM"
-	}
-	if strings.Contains(line, "low") || strings.Contains(line, "optimization") {
-		return "LOW"
-	}
-	return "INFO"
+	return summary
 }
 
 func (s *StaticAnalysisService) GetContainerStatus() (map[string]interface{}, error) {
 	status := make(map[string]interface{})
 
-	cmd := exec.Command("docker", "inspect", s.slitherContainer)
+	cmd := exec.Command("docker", "inspect", s.containerName)
 	output, err := cmd.Output()
 	if err != nil {
 		status["exists"] = false
@@ -439,25 +474,4 @@ func (s *StaticAnalysisService) GetContainerStatus() (map[string]interface{}, er
 	}
 
 	return status, nil
-}
-
-func (s *StaticAnalysisService) calculateSeveritySummary(issues []static_analysis.SlitherIssue) static_analysis.SeveritySummary {
-	summary := static_analysis.SeveritySummary{}
-
-	for _, issue := range issues {
-		switch strings.ToUpper(issue.Severity) {
-		case "HIGH":
-			summary.High++
-		case "MEDIUM":
-			summary.Medium++
-		case "LOW":
-			summary.Low++
-		case "INFORMATIONAL":
-			summary.Informational++
-		default:
-			summary.Informational++ // fallback
-		}
-	}
-
-	return summary
 }

@@ -18,7 +18,7 @@ import (
 
 type ContractService struct {
 	client external.EtherscanService
-	cache  *cache.ContractCache
+	cache  *cache.Cache
 }
 
 type ContractServiceInterface interface {
@@ -40,7 +40,7 @@ func NewContractService(repo repository.ContractRepository, client external.Ethe
 
 	return &ContractService{
 		client: client,
-		cache:  cache.NewContractCache(redisClient, repo),
+		cache:  cache.NewCache(redisClient, repo, nil, nil),
 	}
 }
 
@@ -50,7 +50,7 @@ func (s *ContractService) FetchContractSourceCode(ctx context.Context, req *cont
 	}
 
 	// Check cache (Redis L1 + Database L2)
-	if cached, err := s.cache.Get(ctx, req.Address, req.Network); err == nil && cached != nil {
+	if cached, err := s.cache.GetContract(ctx, req.Address, req.Network); err == nil && cached != nil {
 		return &contracts.GetContractSourceCodeResponse{
 			Address:    cached.Address,
 			SourceCode: cached.SourceCode,
@@ -79,7 +79,7 @@ func (s *ContractService) FetchContractSourceCode(ctx context.Context, req *cont
 	}
 
 	// Save to cache
-	go s.cache.Set(context.Background(), contract)
+	go s.cache.SetContract(context.Background(), contract)
 
 	return &contracts.GetContractSourceCodeResponse{
 		Address:    contract.Address,
@@ -90,7 +90,7 @@ func (s *ContractService) FetchContractSourceCode(ctx context.Context, req *cont
 }
 
 func (s *ContractService) GetContractByAddressAndNetwork(ctx context.Context, address, network string) (*contracts.ContractResponse, error) {
-	contract, err := s.cache.Get(ctx, address, network)
+	contract, err := s.cache.GetContract(ctx, address, network)
 	if err != nil || contract == nil {
 		return nil, fmt.Errorf("contract not found")
 	}

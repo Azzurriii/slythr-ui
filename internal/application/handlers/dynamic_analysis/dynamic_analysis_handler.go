@@ -2,61 +2,62 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/dynamic_analysis"
+	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/analysis"
 	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
 	"github.com/gin-gonic/gin"
 )
 
 type DynamicAnalysisHandler struct {
-	dynamicAnalysisService *services.DynamicAnalysisService
+	service *services.DynamicAnalysisService
 }
 
-func NewDynamicAnalysisHandler(dynamicAnalysisService *services.DynamicAnalysisService) *DynamicAnalysisHandler {
+func NewDynamicAnalysisHandler(service *services.DynamicAnalysisService) *DynamicAnalysisHandler {
 	return &DynamicAnalysisHandler{
-		dynamicAnalysisService: dynamicAnalysisService,
+		service: service,
 	}
 }
 
 // AnalyzeContract godoc
-// @Summary Analyze Solidity contract for security vulnerabilities using LLM
-// @Description Performs dynamic security analysis on Solidity source code using Gemini LLM
+// @Summary Analyze Solidity contract using AI for security vulnerabilities
+// @Description Performs dynamic security analysis on Solidity source code using AI/LLM
 // @Tags dynamic-analysis
 // @Accept json
 // @Produce json
 // @Param request body dynamic_analysis.AnalyzeRequest true "Contract source code"
 // @Router /dynamic-analysis [post]
 func (h *DynamicAnalysisHandler) AnalyzeContract(c *gin.Context) {
-	var req dynamic_analysis.AnalyzeRequest
+	var req analysis.AnalyzeRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Invalid request format",
-			"error":   err.Error(),
-		})
+		h.respondError(c, http.StatusBadRequest, "Invalid request format", err)
 		return
 	}
 
-	// Validate source code is not empty
-	if len(req.SourceCode) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Source code cannot be empty",
-		})
+	if strings.TrimSpace(req.SourceCode) == "" {
+		h.respondError(c, http.StatusBadRequest, "Source code cannot be empty", nil)
 		return
 	}
 
-	// Perform dynamic analysis using LLM with context
-	result, err := h.dynamicAnalysisService.AnalyzeContract(c.Request.Context(), req.SourceCode)
+	result, err := h.service.AnalyzeContract(c.Request.Context(), req.SourceCode)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"message": "Failed to analyze contract",
-			"error":   err.Error(),
-		})
+		h.respondError(c, http.StatusInternalServerError, "Failed to analyze contract", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *DynamicAnalysisHandler) respondError(c *gin.Context, status int, message string, err error) {
+	response := gin.H{
+		"success": false,
+		"message": message,
+	}
+
+	if err != nil {
+		response["error"] = err.Error()
+	}
+
+	c.JSON(status, response)
 }

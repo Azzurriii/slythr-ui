@@ -8,6 +8,7 @@ import (
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
 	domainerrors "github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +34,7 @@ func (r *contractRepository) SaveContract(ctx context.Context, contract *entitie
 
 func (r *contractRepository) FindByID(ctx context.Context, id entities.ContractID) (*entities.Contract, error) {
 	var contract entities.Contract
-	err := r.db.WithContext(ctx).First(&contract, uint(id)).Error
+	err := r.db.WithContext(ctx).First(&contract, uuid.UUID(id)).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerrors.ErrContractNotFound
@@ -113,7 +114,7 @@ func (r *contractRepository) UpdateContract(ctx context.Context, contract *entit
 }
 
 func (r *contractRepository) RemoveContract(ctx context.Context, id entities.ContractID) error {
-	result := r.db.WithContext(ctx).Delete(&entities.Contract{}, uint(id))
+	result := r.db.WithContext(ctx).Delete(&entities.Contract{}, uuid.UUID(id))
 	if result.Error != nil {
 		return fmt.Errorf("failed to remove contract: %w", result.Error)
 	}

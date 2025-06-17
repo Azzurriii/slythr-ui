@@ -8,6 +8,7 @@ import (
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
 	domainerrors "github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +34,7 @@ func (r *dynamicAnalysisRepository) SaveAnalysis(ctx context.Context, analysis *
 
 func (r *dynamicAnalysisRepository) FindByID(ctx context.Context, id entities.DynamicAnalysisID) (*entities.DynamicAnalysis, error) {
 	var analysis entities.DynamicAnalysis
-	err := r.db.WithContext(ctx).First(&analysis, uint(id)).Error
+	err := r.db.WithContext(ctx).First(&analysis, uuid.UUID(id)).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerrors.ErrAnalysisNotFound
@@ -46,7 +47,7 @@ func (r *dynamicAnalysisRepository) FindByID(ctx context.Context, id entities.Dy
 func (r *dynamicAnalysisRepository) FindByContractID(ctx context.Context, contractID entities.ContractID) ([]*entities.DynamicAnalysis, error) {
 	var analyses []*entities.DynamicAnalysis
 	err := r.db.WithContext(ctx).
-		Where("contract_id = ?", uint(contractID)).
+		Where("contract_id = ?", uuid.UUID(contractID)).
 		Order("created_at DESC").
 		Find(&analyses).Error
 
@@ -75,7 +76,7 @@ func (r *dynamicAnalysisRepository) FindBySourceHash(ctx context.Context, source
 func (r *dynamicAnalysisRepository) FindLatestByContractID(ctx context.Context, contractID entities.ContractID) (*entities.DynamicAnalysis, error) {
 	var analysis entities.DynamicAnalysis
 	err := r.db.WithContext(ctx).
-		Where("contract_id = ?", uint(contractID)).
+		Where("contract_id = ?", uuid.UUID(contractID)).
 		Order("created_at DESC").
 		First(&analysis).Error
 
@@ -102,7 +103,7 @@ func (r *dynamicAnalysisRepository) UpdateAnalysis(ctx context.Context, analysis
 }
 
 func (r *dynamicAnalysisRepository) RemoveAnalysis(ctx context.Context, id entities.DynamicAnalysisID) error {
-	result := r.db.WithContext(ctx).Delete(&entities.DynamicAnalysis{}, uint(id))
+	result := r.db.WithContext(ctx).Delete(&entities.DynamicAnalysis{}, uuid.UUID(id))
 	if result.Error != nil {
 		return fmt.Errorf("failed to remove dynamic analysis: %w", result.Error)
 	}

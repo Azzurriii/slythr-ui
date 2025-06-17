@@ -21,14 +21,14 @@ type Server struct {
 	logger Logger
 }
 
-// NewServerWithLogger creates a new server with logger
 func NewServer(engine *gin.Engine, logger Logger) *Server {
 	return &Server{
 		engine: engine,
 		http: &http.Server{
 			Handler:      engine,
-			ReadTimeout:  5 * time.Second,
-			WriteTimeout: 10 * time.Second,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 120 * time.Second,
+			IdleTimeout:  180 * time.Second,
 		},
 		logger: logger,
 	}

@@ -22,6 +22,7 @@ type Logger interface {
 type RouterDependencies struct {
 	ContractRepo        repository.ContractRepository
 	DynamicAnalysisRepo repository.DynamicAnalysisRepository
+	StaticAnalysisRepo  repository.StaticAnalysisRepository
 	EtherscanClient     external.EtherscanService
 	Logger              Logger
 	Config              *config.Config
@@ -48,9 +49,17 @@ func SetupRouter(deps *RouterDependencies) *gin.Engine {
 		panic("Failed to create dynamic analysis service: " + err.Error())
 	}
 
+	staticAnalysisService, err := services.NewStaticAnalysisService(
+		deps.StaticAnalysisRepo,
+		nil, // Use default options
+	)
+	if err != nil {
+		panic("Failed to create static analysis service: " + err.Error())
+	}
+
 	// Create handlers
 	contractHandler := contractHandlers.NewContractHandler(contractService)
-	staticAnalysisHandler := staticAnalysisHandlers.NewStaticAnalysisHandler()
+	staticAnalysisHandler := staticAnalysisHandlers.NewStaticAnalysisHandler(staticAnalysisService)
 	dynamicAnalysisHandler := dynamicAnalysisHandlers.NewDynamicAnalysisHandler(dynamicAnalysisService)
 
 	setupAPIRoutes(r, contractHandler, staticAnalysisHandler, dynamicAnalysisHandler)

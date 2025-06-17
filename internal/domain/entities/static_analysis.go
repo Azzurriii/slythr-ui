@@ -4,22 +4,20 @@ import (
 	"time"
 
 	"github.com/Azzurriii/slythr-go-backend/internal/domain/valueobjects"
+	"github.com/google/uuid"
 )
 
-// StaticAnalysis represents a static analysis result in the domain
 type StaticAnalysis struct {
-	ID         StaticAnalysisID `gorm:"primaryKey" json:"id"`
-	SourceHash string           `gorm:"not null;size:64;index" json:"source_hash"`
-	Results    string           `gorm:"type:jsonb;not null" json:"results"`
-	CreatedAt  time.Time        `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt  time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
+	ID            StaticAnalysisID `gorm:"type:uuid;primaryKey" json:"id"`
+	SourceHash    string           `gorm:"not null;size:64;index" json:"source_hash"`
+	SlitherOutput string           `gorm:"type:jsonb;not null" json:"slither_output"`
+	CreatedAt     time.Time        `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt     time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
-// StaticAnalysisID represents the unique identifier for a static analysis
-type StaticAnalysisID uint
+type StaticAnalysisID uuid.UUID
 
-// NewStaticAnalysis creates a new static analysis with validation
-func NewStaticAnalysis(sourceHash, results string) (*StaticAnalysis, error) {
+func NewStaticAnalysis(sourceHash, slitherOutput string) (*StaticAnalysis, error) {
 	// Validate source hash
 	sourceHashVO, err := valueobjects.NewSourceHash(sourceHash)
 	if err != nil {
@@ -27,42 +25,43 @@ func NewStaticAnalysis(sourceHash, results string) (*StaticAnalysis, error) {
 	}
 
 	// Validate analysis results
-	resultsVO, err := valueobjects.NewAnalysisResults(results)
+	slitherOutputVO, err := valueobjects.NewAnalysisResults(slitherOutput)
 	if err != nil {
 		return nil, err
 	}
 
 	return &StaticAnalysis{
-		SourceHash: sourceHashVO.Value(),
-		Results:    resultsVO.Value(),
+		ID:            StaticAnalysisID(uuid.New()),
+		SourceHash:    sourceHashVO.Value(),
+		SlitherOutput: slitherOutputVO.Value(),
 	}, nil
 }
 
-// GetID returns the static analysis ID
 func (s *StaticAnalysis) GetID() StaticAnalysisID {
 	return s.ID
 }
 
-// GetSourceHash returns the source hash as value object
 func (s *StaticAnalysis) GetSourceHash() valueobjects.SourceHash {
 	sourceHash, _ := valueobjects.NewSourceHash(s.SourceHash)
 	return sourceHash
 }
 
-// GetResults returns the analysis results as value object
-func (s *StaticAnalysis) GetResults() valueobjects.AnalysisResults {
-	results, _ := valueobjects.NewAnalysisResults(s.Results)
+func (s *StaticAnalysis) GetResponse() valueobjects.AnalysisResults {
+	results, _ := valueobjects.NewAnalysisResults(s.SlitherOutput)
 	return results
 }
 
-// IsValid checks if the static analysis is valid
 func (s *StaticAnalysis) IsValid() bool {
+	if s.ID == StaticAnalysisID(uuid.Nil) {
+		return false
+	}
+
 	sourceHash, err := valueobjects.NewSourceHash(s.SourceHash)
 	if err != nil {
 		return false
 	}
 
-	results, err := valueobjects.NewAnalysisResults(s.Results)
+	results, err := valueobjects.NewAnalysisResults(s.SlitherOutput)
 	if err != nil {
 		return false
 	}
@@ -70,13 +69,15 @@ func (s *StaticAnalysis) IsValid() bool {
 	return sourceHash.IsValid() && results.IsValid()
 }
 
-// HasResults checks if the analysis has valid results
 func (s *StaticAnalysis) HasResults() bool {
-	results := s.GetResults()
+	results := s.GetResponse()
 	return results.HasResults()
 }
 
-// TableName returns the table name for GORM
+func (id StaticAnalysisID) String() string {
+	return uuid.UUID(id).String()
+}
+
 func (StaticAnalysis) TableName() string {
 	return "static_analysis"
 }
