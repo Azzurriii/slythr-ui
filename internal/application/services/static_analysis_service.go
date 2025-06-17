@@ -121,22 +121,25 @@ func (s *StaticAnalysisService) AnalyzeContract(source string) (*static_analysis
 	if err != nil {
 		s.logger.Errorf("Failed to run Slither: %v", err)
 		return &static_analysis.AnalyzeResponse{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to run Slither: %v", err),
-			RawOutput: slitherOutput,
+			Success: false,
+			Message: fmt.Sprintf("Failed to run Slither: %v", err),
 		}, err
 	}
 
 	issues := s.parseSlitherOutput(slitherOutput)
 	s.logger.Infof("Static analysis completed successfully, found %d issues", len(issues))
 
-	return &static_analysis.AnalyzeResponse{
-		Success:     true,
-		Issues:      issues,
-		TotalIssues: len(issues),
-		AnalyzedAt:  time.Now(),
-		RawOutput:   slitherOutput,
-	}, nil
+	severitySummary := s.calculateSeveritySummary(issues)
+
+	response := &static_analysis.AnalyzeResponse{
+		Success:         true,
+		Issues:          issues,
+		TotalIssues:     len(issues),
+		SeveritySummary: severitySummary,
+		AnalyzedAt:      time.Now(),
+	}
+
+	return response, nil
 }
 
 func (s *StaticAnalysisService) isContainerRunning() bool {
@@ -153,12 +156,22 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Build Slither command to run in container
+	// Detect Solidity version từ contract source
+	solcVersion, err := s.detectSolidityVersion(analysisDir, contractFile)
+	if err != nil {
+		s.logger.Warnf("Failed to detect Solidity version, using default: %v", err)
+		solcVersion = "0.8.20" // fallback
+	}
+
+	// Build Slither command với --solc-solcs-select flag
 	slitherCmd := fmt.Sprintf(
-		"cd %s && slither %s --solc-remaps '@openzeppelin=node_modules/@openzeppelin' --json -",
+		"cd %s && slither %s --solc-remaps '@openzeppelin=node_modules/@openzeppelin' --solc-solcs-select %s --json -",
 		analysisDir,
 		contractFile,
+		solcVersion,
 	)
+
+	s.logger.Infof("Executing Slither command: %s", slitherCmd)
 
 	// Execute in container
 	cmd := exec.CommandContext(ctx, "docker", "exec", s.slitherContainer, "bash", "-c", slitherCmd)
@@ -167,18 +180,89 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 
 	output := stdout.String()
-	if output == "" {
-		output = stderr.String()
+	errorOutput := stderr.String()
+
+	s.logger.Infof("Slither stdout: %s", output)
+	s.logger.Infof("Slither stderr: %s", errorOutput)
+
+	// Return stderr nếu stdout trống
+	if output == "" && errorOutput != "" {
+		output = errorOutput
 	}
 
-	if err != nil && output == "" {
-		return "", fmt.Errorf("slither execution failed: %v", err)
+	// Slither trả về exit code 255 khi có findings - đây KHÔNG phải lỗi
+	// Chỉ return error nếu không có output hoặc có stderr mà không có stdout
+	if err != nil {
+		// Kiểm tra nếu có JSON output hợp lệ thì coi như success
+		if output != "" && (strings.Contains(output, `"success": true`) || strings.Contains(output, `"results"`)) {
+			s.logger.Infof("Slither completed with findings (exit code %v), parsing results", err)
+			return output, nil
+		}
+
+		s.logger.Errorf("Slither command failed with error: %v, stderr: %s", err, errorOutput)
+		return output, fmt.Errorf("slither execution failed: %v, stderr: %s", err, errorOutput)
 	}
 
 	return output, nil
+}
+
+func (s *StaticAnalysisService) detectSolidityVersion(analysisDir, contractFile string) (string, error) {
+	readCmd := exec.Command("docker", "exec", s.slitherContainer, "cat", filepath.Join(analysisDir, contractFile))
+	output, err := readCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to read contract file: %v", err)
+	}
+
+	content := string(output)
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "pragma solidity") {
+			version := s.extractVersionFromPragma(line)
+			if version != "" {
+				s.logger.Infof("Detected Solidity version: %s", version)
+				return version, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no pragma solidity found")
+}
+
+func (s *StaticAnalysisService) extractVersionFromPragma(pragma string) string {
+	pragma = strings.TrimPrefix(pragma, "pragma solidity")
+	pragma = strings.TrimSpace(pragma)
+	pragma = strings.TrimSuffix(pragma, ";")
+	pragma = strings.TrimSpace(pragma)
+
+	if strings.HasPrefix(pragma, "^") {
+		if strings.HasPrefix(pragma, "^0.8") {
+			return "0.8.20"
+		} else if strings.HasPrefix(pragma, "^0.7") {
+			return "0.7.6"
+		} else if strings.HasPrefix(pragma, "^0.6") {
+			return "0.6.12"
+		} else if strings.HasPrefix(pragma, "^0.5") {
+			return "0.5.16"
+		}
+	} else if strings.HasPrefix(pragma, ">=") {
+		if strings.Contains(pragma, "0.8") {
+			return "0.8.20"
+		} else if strings.Contains(pragma, "0.7") {
+			return "0.7.6"
+		}
+	} else {
+		version := strings.Fields(pragma)[0]
+		if len(version) > 0 && (version[0] >= '0' && version[0] <= '9') {
+			return version
+		}
+	}
+
+	return "0.8.20"
 }
 
 func (s *StaticAnalysisService) parseSlitherOutput(output string) []static_analysis.SlitherIssue {
@@ -210,18 +294,27 @@ func (s *StaticAnalysisService) parseSlitherOutput(output string) []static_analy
 			issue := static_analysis.SlitherIssue{
 				Type:        "detector",
 				Title:       s.formatTitle(detector.Check),
-				Description: detector.Description,
+				Description: s.cleanDescription(detector.Description),
 				Severity:    strings.ToUpper(detector.Impact),
 				Confidence:  detector.Confidence,
 				Reference:   detector.Reference,
 			}
 
+			// Format location đẹp hơn
 			if len(detector.Elements) > 0 {
 				element := detector.Elements[0]
 				if len(element.SourceMapping.Lines) > 0 {
-					issue.Location = fmt.Sprintf("%s#L%d",
-						element.SourceMapping.Filename,
-						element.SourceMapping.Lines[0])
+					line := element.SourceMapping.Lines[0]
+					if len(element.SourceMapping.Lines) > 1 {
+						lastLine := element.SourceMapping.Lines[len(element.SourceMapping.Lines)-1]
+						if lastLine != line {
+							issue.Location = fmt.Sprintf("Contract.sol:L%d-L%d", line, lastLine)
+						} else {
+							issue.Location = fmt.Sprintf("Contract.sol:L%d", line)
+						}
+					} else {
+						issue.Location = fmt.Sprintf("Contract.sol:L%d", line)
+					}
 				}
 			}
 
@@ -278,6 +371,22 @@ func (s *StaticAnalysisService) formatTitle(check string) string {
 	return strings.Join(words, " ")
 }
 
+func (s *StaticAnalysisService) cleanDescription(description string) string {
+	// Bỏ các ký tự xuống dòng và tab không cần thiết
+	cleaned := strings.ReplaceAll(description, "\\n", " ")
+	cleaned = strings.ReplaceAll(cleaned, "\\t", " ")
+
+	// Bỏ khoảng trắng thừa
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+
+	// Giới hạn độ dài nếu quá dài
+	if len(cleaned) > 200 {
+		cleaned = cleaned[:197] + "..."
+	}
+
+	return strings.TrimSpace(cleaned)
+}
+
 func (s *StaticAnalysisService) extractTitle(description string) string {
 	parts := strings.SplitN(description, ".", 2)
 	if len(parts) > 0 {
@@ -302,4 +411,53 @@ func (s *StaticAnalysisService) extractSeverity(line string) string {
 		return "LOW"
 	}
 	return "INFO"
+}
+
+func (s *StaticAnalysisService) GetContainerStatus() (map[string]interface{}, error) {
+	status := make(map[string]interface{})
+
+	cmd := exec.Command("docker", "inspect", s.slitherContainer)
+	output, err := cmd.Output()
+	if err != nil {
+		status["exists"] = false
+		status["running"] = false
+		status["error"] = err.Error()
+		return status, err
+	}
+
+	var containerInfo []map[string]interface{}
+	if err := json.Unmarshal(output, &containerInfo); err != nil {
+		return status, err
+	}
+
+	if len(containerInfo) > 0 {
+		state := containerInfo[0]["State"].(map[string]interface{})
+		status["exists"] = true
+		status["running"] = state["Running"]
+		status["status"] = state["Status"]
+		status["started_at"] = state["StartedAt"]
+	}
+
+	return status, nil
+}
+
+func (s *StaticAnalysisService) calculateSeveritySummary(issues []static_analysis.SlitherIssue) static_analysis.SeveritySummary {
+	summary := static_analysis.SeveritySummary{}
+
+	for _, issue := range issues {
+		switch strings.ToUpper(issue.Severity) {
+		case "HIGH":
+			summary.High++
+		case "MEDIUM":
+			summary.Medium++
+		case "LOW":
+			summary.Low++
+		case "INFORMATIONAL":
+			summary.Informational++
+		default:
+			summary.Informational++ // fallback
+		}
+	}
+
+	return summary
 }

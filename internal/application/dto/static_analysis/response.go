@@ -12,11 +12,18 @@ type SlitherIssue struct {
 	Reference   string `json:"reference"`
 }
 
+type SeveritySummary struct {
+	High          int `json:"high"`
+	Medium        int `json:"medium"`
+	Low           int `json:"low"`
+	Informational int `json:"informational"`
+}
+
 type AnalyzeResponse struct {
-	Success     bool           `json:"success"`
-	Message     string         `json:"message,omitempty"`
-	Issues      []SlitherIssue `json:"issues"`
-	TotalIssues int            `json:"total_issues"`
-	AnalyzedAt  time.Time      `json:"analyzed_at"`
-	RawOutput   string         `json:"raw_output,omitempty"`
+	Success         bool            `json:"success"`
+	Message         string          `json:"message,omitempty"`
+	Issues          []SlitherIssue  `json:"issues"`
+	TotalIssues     int             `json:"total_issues"`
+	SeveritySummary SeveritySummary `json:"severity_summary"`
+	AnalyzedAt      time.Time       `json:"analyzed_at"`
 }
