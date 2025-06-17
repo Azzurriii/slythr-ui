@@ -18,13 +18,11 @@ type StaticAnalysis struct {
 type StaticAnalysisID uuid.UUID
 
 func NewStaticAnalysis(sourceHash, slitherOutput string) (*StaticAnalysis, error) {
-	// Validate source hash
 	sourceHashVO, err := valueobjects.NewSourceHash(sourceHash)
 	if err != nil {
 		return nil, err
 	}
 
-	// Validate analysis results
 	slitherOutputVO, err := valueobjects.NewAnalysisResults(slitherOutput)
 	if err != nil {
 		return nil, err

@@ -8,7 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// Contract represents a smart contract entity in the domain
 type Contract struct {
 	ID              ContractID     `gorm:"type:uuid;primaryKey"`
 	Address         string         `gorm:"uniqueIndex:idx_address_network;not null;size:42"`
@@ -22,10 +21,8 @@ type Contract struct {
 	DeletedAt       gorm.DeletedAt `gorm:"index"`
 }
 
-// ContractID represents the unique identifier for a contract
 type ContractID uuid.UUID
 
-// NewContract creates a new contract with validation
 func NewContract(
 	address string,
 	network string,
@@ -34,7 +31,6 @@ func NewContract(
 	compilerVersion string,
 	sourceHash string,
 ) (*Contract, error) {
-	// Validate using value objects
 	addressVO, err := valueobjects.NewContractAddress(address)
 	if err != nil {
 		return nil, err

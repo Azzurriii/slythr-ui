@@ -22,7 +22,10 @@ const (
 	staticAnalysisPrefix  = "static_analysis"
 )
 
-// Cache provides caching for all entities with Redis L1 and Database L2
+/*
+Cache provides caching for all entities with Redis and Database
+Redis is used as a cache layer and Database is used as a persistence layer
+*/
 type Cache struct {
 	redis               *redis.Client
 	contractRepo        repository.ContractRepository
@@ -30,7 +33,6 @@ type Cache struct {
 	staticAnalysisRepo  repository.StaticAnalysisRepository
 }
 
-// NewCache creates a new unified cache instance
 func NewCache(
 	redis *redis.Client,
 	contractRepo repository.ContractRepository,
@@ -45,10 +47,7 @@ func NewCache(
 	}
 }
 
-// Contract Cache Methods
-
 func (c *Cache) GetContract(ctx context.Context, address, network string) (*contracts.ContractResponse, error) {
-	// L1: Try Redis first
 	if c.redis != nil {
 		key := c.buildKey(contractPrefix, address, network)
 		if data, err := c.redis.Get(ctx, key).Result(); err == nil {
@@ -59,7 +58,6 @@ func (c *Cache) GetContract(ctx context.Context, address, network string) (*cont
 		}
 	}
 
-	// L2: Try Database
 	if c.contractRepo == nil {
 		return nil, nil
 	}
@@ -80,21 +78,17 @@ func (c *Cache) GetContract(ctx context.Context, address, network string) (*cont
 		UpdatedAt:       contract.UpdatedAt,
 	}
 
-	// Warm Redis cache
 	c.setRedisAsync(c.buildKey(contractPrefix, address, network), result, defaultCacheTTL)
 
 	return result, nil
 }
 
 func (c *Cache) SetContract(ctx context.Context, contract *entities.Contract) error {
-	// Save to Database (L2)
 	if c.contractRepo != nil {
 		if err := c.contractRepo.SaveContract(ctx, contract); err != nil {
-			// Log error but continue to cache in Redis
 		}
 	}
 
-	// Save to Redis (L1)
 	result := &contracts.ContractResponse{
 		Address:         contract.Address,
 		Network:         contract.Network,
@@ -110,10 +104,7 @@ func (c *Cache) SetContract(ctx context.Context, contract *entities.Contract) er
 	return nil
 }
 
-// Dynamic Analysis Cache Methods
-
 func (c *Cache) GetDynamicAnalysis(ctx context.Context, sourceHash string) (*analysis.DynamicAnalysisResponse, error) {
-	// L1: Try Redis first
 	if c.redis != nil {
 		key := c.buildKey(dynamicAnalysisPrefix, sourceHash)
 		if data, err := c.redis.Get(ctx, key).Result(); err == nil {
@@ -124,7 +115,6 @@ func (c *Cache) GetDynamicAnalysis(ctx context.Context, sourceHash string) (*ana
 		}
 	}
 
-	// L2: Try Database
 	if c.dynamicAnalysisRepo == nil {
 		return nil, nil
 	}
@@ -144,14 +134,12 @@ func (c *Cache) GetDynamicAnalysis(ctx context.Context, sourceHash string) (*ana
 		return nil, nil
 	}
 
-	// Warm Redis cache
 	c.setRedisAsync(c.buildKey(dynamicAnalysisPrefix, sourceHash), result, defaultCacheTTL)
 
 	return &result, nil
 }
 
 func (c *Cache) SetDynamicAnalysis(ctx context.Context, sourceHash string, result *analysis.DynamicAnalysisResponse) error {
-	// Save to Database (L2)
 	if c.dynamicAnalysisRepo != nil {
 		data, err := json.Marshal(result)
 		if err == nil {
@@ -161,15 +149,11 @@ func (c *Cache) SetDynamicAnalysis(ctx context.Context, sourceHash string, resul
 		}
 	}
 
-	// Save to Redis (L1)
 	c.setRedisAsync(c.buildKey(dynamicAnalysisPrefix, sourceHash), result, defaultCacheTTL)
 	return nil
 }
 
-// Static Analysis Cache Methods
-
 func (c *Cache) GetStaticAnalysis(ctx context.Context, sourceHash string) (*analysis.StaticAnalysisResponse, error) {
-	// L1: Try Redis first
 	if c.redis != nil {
 		key := c.buildKey(staticAnalysisPrefix, sourceHash)
 		if data, err := c.redis.Get(ctx, key).Result(); err == nil {
@@ -180,7 +164,6 @@ func (c *Cache) GetStaticAnalysis(ctx context.Context, sourceHash string) (*anal
 		}
 	}
 
-	// L2: Try Database
 	if c.staticAnalysisRepo == nil {
 		return nil, nil
 	}
@@ -200,14 +183,12 @@ func (c *Cache) GetStaticAnalysis(ctx context.Context, sourceHash string) (*anal
 		return nil, nil
 	}
 
-	// Warm Redis cache
 	c.setRedisAsync(c.buildKey(staticAnalysisPrefix, sourceHash), result, defaultCacheTTL)
 
 	return &result, nil
 }
 
 func (c *Cache) SetStaticAnalysis(ctx context.Context, sourceHash string, result *analysis.StaticAnalysisResponse) error {
-	// Save to Database (L2)
 	if c.staticAnalysisRepo != nil {
 		data, err := json.Marshal(result)
 		if err == nil {
@@ -217,12 +198,9 @@ func (c *Cache) SetStaticAnalysis(ctx context.Context, sourceHash string, result
 		}
 	}
 
-	// Save to Redis (L1)
 	c.setRedisAsync(c.buildKey(staticAnalysisPrefix, sourceHash), result, defaultCacheTTL)
 	return nil
 }
-
-// Helper Methods
 
 func (c *Cache) buildKey(prefix string, parts ...string) string {
 	key := prefix
@@ -243,8 +221,6 @@ func (c *Cache) setRedisAsync(key string, data interface{}, ttl time.Duration) {
 		}
 	}()
 }
-
-// Invalidation Methods
 
 func (c *Cache) InvalidateContract(address, network string) error {
 	if c.redis != nil {
@@ -270,8 +246,6 @@ func (c *Cache) InvalidateStaticAnalysis(sourceHash string) error {
 	return nil
 }
 
-// Bulk Operations
-
 func (c *Cache) InvalidateAll() error {
 	if c.redis != nil {
 		patterns := []string{
@@ -292,8 +266,6 @@ func (c *Cache) InvalidateAll() error {
 	}
 	return nil
 }
-
-// Health Check
 
 func (c *Cache) HealthCheck(ctx context.Context) error {
 	if c.redis != nil {

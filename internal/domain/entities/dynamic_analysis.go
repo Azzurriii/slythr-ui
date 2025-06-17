@@ -20,13 +20,11 @@ type DynamicAnalysis struct {
 type DynamicAnalysisID uuid.UUID
 
 func NewDynamicAnalysis(sourceHash, llmResponse string) (*DynamicAnalysis, error) {
-	// Validate source hash
 	sourceHashVO, err := valueobjects.NewSourceHash(sourceHash)
 	if err != nil {
 		return nil, err
 	}
 
-	// Validate LLM response
 	llmResponseVO, err := valueobjects.NewLLMResponse(llmResponse)
 	if err != nil {
 		return nil, err

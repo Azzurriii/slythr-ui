@@ -6,7 +6,6 @@ import (
 	"net/http"
 )
 
-// DomainError represents a domain-specific error
 type DomainError struct {
 	Code    string
 	Message string

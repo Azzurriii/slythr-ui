@@ -9,9 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Migrate function to run database migrations
 func Migrate() error {
-	// Load from environment variables or configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -25,7 +23,6 @@ func Migrate() error {
 		return err
 	}
 
-	// AutoMigrate runs the migration for all entities
 	if err := db.AutoMigrate(
 		&entities.Contract{},
 		&entities.StaticAnalysis{},

@@ -49,7 +49,7 @@ func (s *ContractService) FetchContractSourceCode(ctx context.Context, req *cont
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
 
-	// Check cache (Redis L1 + Database L2)
+	// Check cache
 	if cached, err := s.cache.GetContract(ctx, req.Address, req.Network); err == nil && cached != nil {
 		return &contracts.GetContractSourceCodeResponse{
 			Address:    cached.Address,
