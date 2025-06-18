@@ -10,23 +10,27 @@ Slythr is a smart contract security analysis platform that provides comprehensiv
 ## Key Features
 
 **API-First Architecture**
+
 - RESTful API interface eliminates need for local Slither installation
 - Frontend-ready endpoints for seamless integration
 - Comprehensive JSON responses with structured vulnerability data
 
 **Advanced Analysis Capabilities**
+
 - Static analysis powered by containerized Slither environment
 - AI-driven security assessment using Google Gemini
 - Multi-file project analysis with dependency resolution
 - Cross-contract vulnerability detection
 
 **Performance**
+
 - Multi-layer caching strategy (Redis L1 + PostgreSQL L2)
 - Intelligent deduplication through source code hashing
 - Concurrent analysis processing for optimal throughput
 - Smart contract verification and fetching from Etherscan
 
 **Production-Ready Infrastructure**
+
 - Clean Architecture with clear separation of concerns
 - Containerized deployment with Docker Compose
 - Comprehensive health monitoring and metrics
@@ -40,16 +44,16 @@ The system follows Clean Architecture principles with dependency inversion:
 
 ## Technology Stack
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Backend** | Go 1.24+ | High-performance API server |
-| **Web Framework** | Gin Gonic | HTTP routing and middleware |
-| **Database** | PostgreSQL | Data persistence and analysis history |
-| **Cache** | Redis | High-speed result caching |
-| **ORM** | GORM | Database abstraction |
-| **Containerization** | Docker Compose | Service orchestration |
-| **Static Analysis** | Slither (Containerized) | Vulnerability detection |
-| **AI Analysis** | Google Gemini | Contextual security insights |
+| Component            | Technology              | Purpose                               |
+| -------------------- | ----------------------- | ------------------------------------- |
+| **Backend**          | Go 1.24+                | High-performance API server           |
+| **Web Framework**    | Gin Gonic               | HTTP routing and middleware           |
+| **Database**         | PostgreSQL              | Data persistence and analysis history |
+| **Cache**            | Redis                   | High-speed result caching             |
+| **ORM**              | GORM                    | Database abstraction                  |
+| **Containerization** | Docker Compose          | Service orchestration                 |
+| **Static Analysis**  | Slither (Containerized) | Vulnerability detection               |
+| **AI Analysis**      | Google Gemini           | Contextual security insights          |
 
 ## Quick Start
 
@@ -61,6 +65,7 @@ The system follows Clean Architecture principles with dependency inversion:
 ### Installation
 
 1. **Clone and configure**
+
    ```bash
    git clone https://github.com/Azzurriii/slythr-go-backend.git
    cd slythr-go-backend
@@ -68,20 +73,22 @@ The system follows Clean Architecture principles with dependency inversion:
    ```
 
 2. **Set required environment variables**
+
    ```env
    ETHERSCAN_API_KEY=your_etherscan_api_key
    GEMINI_API_KEY=your_gemini_api_key
-   
+
    DB_HOST=postgres
    DB_USER=slythr
    DB_PASSWORD=secure_password
    DB_NAME=slythr_db
-   
+
    REDIS_HOST=redis
    SERVER_PORT=8080
    ```
 
 3. **Start services**
+
    ```bash
    make docker-run
    # or
@@ -166,26 +173,12 @@ Complete API documentation is available via Swagger UI at `/swagger/index.html` 
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-feature`)
-3. Implement changes with tests
-4. Ensure all tests pass (`make test`)
-5. Submit a pull request
-
-### Code Standards
-
-- Follow Go best practices and conventions
-- Maintain test coverage above 90%
-- Use meaningful commit messages
-- Document public APIs with comments
-- Run linters before submitting PRs
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Issues
 
-- **API Documentation**: [Swagger UI](http://localhost:8080/swagger/index.html)
 - **Issues**: [GitHub Issues](https://github.com/Azzurriii/slythr-go-backend/issues)
-- **Repository**: [GitHub](https://github.com/Azzurriii/slythr-go-backend)
