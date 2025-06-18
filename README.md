@@ -1,102 +1,191 @@
-# Slythr - Solidity Smart Contract Analyzer
+# Slythr - Solidity Smart Contract Security Analyzer
 
-This repository contains the backend service for Slythr, a comprehensive smart contract analysis platform. Built with Go, it provides a robust API for performing static and dynamic security analysis on Solidity source code. The system is designed with a Clean Architecture approach to ensure maintainability, scalability, and separation of concerns.
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=flat&logo=docker)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![API Documentation](https://img.shields.io/badge/API-Swagger-85EA2D?style=flat&logo=swagger)](http://localhost:8080/swagger/index.html)
 
-## Features
+Slythr is a smart contract security analysis platform that provides comprehensive vulnerability detection for Solidity contracts through RESTful APIs. Built with Golang, it eliminates the complexity of local tooling installation while delivering scalable, production-ready security analysis.
 
-- **Static Analysis**: Leverages the powerful Slither static analysis tool within a dedicated Docker container to detect a wide range of vulnerabilities and code quality issues.
-- **Dynamic AI-Powered Analysis**: Utilizes Google's Gemini AI model to perform a deep, contextual security audit, providing a human-like assessment of vulnerabilities, logical flaws, and best practice deviations.
-- **Etherscan Integration**: Fetches verified smart contract source code directly from Etherscan for various EVM-compatible networks.
-- **Multi-Layer Caching**: Implements a two-layer caching strategy (Redis for L1, PostgreSQL for L2) to optimize performance and reduce redundant analysis and API calls.
-- **Clean Architecture**: Organized following Clean Architecture principles, promoting a clear separation between domain logic, application use cases, and infrastructure details.
-- **Containerized Environment**: Fully containerized using Docker and Docker Compose for consistent development, testing, and deployment environments.
-- **API Documentation**: Provides comprehensive API documentation through Swagger (OpenAPI).
+## Key Features
+
+**API-First Architecture**
+- RESTful API interface eliminates need for local Slither installation
+- Frontend-ready endpoints for seamless integration
+- Comprehensive JSON responses with structured vulnerability data
+
+**Advanced Analysis Capabilities**
+- Static analysis powered by containerized Slither environment
+- AI-driven security assessment using Google Gemini
+- Multi-file project analysis with dependency resolution
+- Cross-contract vulnerability detection
+
+**Performance**
+- Multi-layer caching strategy (Redis L1 + PostgreSQL L2)
+- Intelligent deduplication through source code hashing
+- Concurrent analysis processing for optimal throughput
+- Smart contract verification and fetching from Etherscan
+
+**Production-Ready Infrastructure**
+- Clean Architecture with clear separation of concerns
+- Containerized deployment with Docker Compose
+- Comprehensive health monitoring and metrics
+- Scalable microservice architecture
 
 ## Architecture
 
-The project is structured following the principles of Clean Architecture, which organizes the codebase into a series of concentric layers. This design enforces the dependency rule: source code dependencies can only point inwards.
+The system follows Clean Architecture principles with dependency inversion:
 
-- **Domain**: The innermost layer, containing enterprise-wide business rules and entities. It is the most stable and independent layer. It includes entities, value objects, and repository interfaces.
-- **Application**: This layer contains application-specific business rules and use cases. It orchestrates the flow of data to and from the Domain layer. It includes services, DTOs (Data Transfer Objects), and handlers.
-- **Interface**: The outermost layer, responsible for communication with the outside world. This includes the Gin web framework, routers, handlers, and middleware.
-- **Infrastructure**: This layer provides implementations for the interfaces defined in the layers above. It contains database repositories (GORM), caching clients (Redis), and clients for external services (Etherscan, Gemini, Slither).
+![Architect](architect.png)
 
 ## Technology Stack
 
-- **Backend**: Go 1.24
-- **Framework**: Gin Gonic
-- **Database**: PostgreSQL
-- **ORM**: GORM
-- **Caching**: Redis
-- **Containerization**: Docker, Docker Compose
-- **Static Analysis**: Slither
-- **AI Analysis**: Google Gemini
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Backend** | Go 1.24+ | High-performance API server |
+| **Web Framework** | Gin Gonic | HTTP routing and middleware |
+| **Database** | PostgreSQL | Data persistence and analysis history |
+| **Cache** | Redis | High-speed result caching |
+| **ORM** | GORM | Database abstraction |
+| **Containerization** | Docker Compose | Service orchestration |
+| **Static Analysis** | Slither (Containerized) | Vulnerability detection |
+| **AI Analysis** | Google Gemini | Contextual security insights |
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- [Go](https://golang.org/doc/install) (version 1.24 or later)
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Go 1.24+](https://golang.org/doc/install)
+- [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
 
 ### Installation
 
-1.  **Clone the repository:**
+1. **Clone and configure**
+   ```bash
+   git clone https://github.com/Azzurriii/slythr-go-backend.git
+   cd slythr-go-backend
+   cp .env.example .env
+   ```
 
-    ```sh
-    git clone https://github.com/Azzurriii/slythr-go-backend.git
-    cd slythr-go-backend
-    ```
+2. **Set required environment variables**
+   ```env
+   ETHERSCAN_API_KEY=your_etherscan_api_key
+   GEMINI_API_KEY=your_gemini_api_key
+   
+   DB_HOST=postgres
+   DB_USER=slythr
+   DB_PASSWORD=secure_password
+   DB_NAME=slythr_db
+   
+   REDIS_HOST=redis
+   SERVER_PORT=8080
+   ```
 
-2.  **Set up environment variables:**
-    Copy the example environment file and populate it with your configuration.
+3. **Start services**
+   ```bash
+   make docker-run
+   # or
+   docker-compose up -d
+   ```
 
-    ```sh
-    cp .env.example .env
-    ```
+4. **Verify deployment**
+   ```bash
+   curl http://localhost:8080/health
+   ```
 
-    You will need to provide your own API keys for `ETHERSCAN_API_KEY` and `GEMINI_API_KEY` in the `.env` file.
+API documentation available at: `http://localhost:8080/swagger/index.html`
 
-3.  **Build and run the services:**
-    The easiest way to get all services running is by using Docker Compose. The `Makefile` provides a convenient command for this.
+## Development
 
-    ```sh
-    make docker-run
-    ```
+### Local Development
 
-    This command will build the Go application image, the Slither image, and start all necessary containers (app, postgres, redis, slither) in detached mode.
+```bash
+# Install dependencies
+go mod download
 
-4.  **Verify the setup:**
-    Check the logs to ensure the application has started correctly.
-    ```sh
-    docker-compose logs -f app
-    ```
-    You should see a message indicating that the server has started on the configured port (default: 8080).
+# Run database migrations
+make migrate-up
 
-## Usage
+# Start development server
+make dev
+```
 
-The application can be run directly with Go for development or through Docker for a production-like environment.
+### Available Commands
+
+```bash
+# Development
+make dev              # Start development server
+make test             # Run all tests
+make test-cover       # Run tests with coverage
+make lint             # Run code linters
+
+# Database
+make migrate-up       # Apply database migrations
+make migrate-down     # Rollback migrations
+
+# Docker
+make docker-build     # Build Docker images
+make docker-run       # Start all services
+make docker-stop      # Stop all services
+make docker-clean     # Clean containers and images
+
+# Documentation
+make docs             # Generate Swagger documentation
+```
 
 ## Project Structure
 
-The project follows a logical structure to support Clean Architecture principles.
+```
+slythr-go-backend/
+├── cmd/api/                    # Application entry point
+├── config/                     # Configuration management
+├── docs/                       # Swagger API documentation
+├── internal/
+│   ├── application/            # Application layer (services, use cases)
+│   ├── domain/                 # Domain layer (entities, repositories)
+│   ├── infrastructure/         # Infrastructure (database, cache, external APIs)
+│   └── interface/              # Interface layer (HTTP handlers, routes)
+├── pkg/                        # Shared utilities and packages
+├── scripts/                    # Database migrations and scripts
+├── tests/                      # Test files and fixtures
+├── docker-compose.yml          # Service orchestration
+├── Dockerfile                  # Main application container
+├── Dockerfile.slither          # Slither analysis environment
+└── Makefile                    # Development automation
+```
 
-```
-└── azzurriii-slythr-go-backend/
-    ├── cmd/api/            # Application entry point (main.go)
-    ├── config/             # Configuration loading (Viper)
-    ├── docs/               # Swagger API documentation files
-    ├── internal/           # Core application code
-    │   ├── application/    # Application layer
-    │   ├── domain/         # Domain layer
-    │   ├── infrastructure/ # Infrastructure layer
-    │   └── interface/      # Interface layer (HTTP routes, server)
-    ├── pkg/                # Shared, reusable packages (logger, utils)
-    ├── scripts/            # Standalone scripts (e.g., migrations)
-    ├── .env.example        # Example environment file
-    ├── Dockerfile          # Dockerfile for the main Go application
-    ├── Dockerfile.slither  # Dockerfile for the Slither analysis environment
-    ├── docker-compose.yml  # Docker Compose configuration for all services
-    └── Makefile            # Makefile for common development tasks
-```
+## API Documentation
+
+Complete API documentation is available via Swagger UI at `/swagger/index.html` when the server is running. The documentation includes:
+
+- Interactive API explorer
+- Request/response schemas
+- Authentication requirements
+- Error code explanations
+- Usage examples
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/new-feature`)
+3. Implement changes with tests
+4. Ensure all tests pass (`make test`)
+5. Submit a pull request
+
+### Code Standards
+
+- Follow Go best practices and conventions
+- Maintain test coverage above 90%
+- Use meaningful commit messages
+- Document public APIs with comments
+- Run linters before submitting PRs
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **API Documentation**: [Swagger UI](http://localhost:8080/swagger/index.html)
+- **Issues**: [GitHub Issues](https://github.com/Azzurriii/slythr-go-backend/issues)
+- **Repository**: [GitHub](https://github.com/Azzurriii/slythr-go-backend)
