@@ -67,8 +67,8 @@ The system follows Clean Architecture principles with dependency inversion:
 1. **Clone and configure**
 
    ```bash
-   git clone https://github.com/Azzurriii/slythr-go-backend.git
-   cd slythr-go-backend
+   git clone https://github.com/Azzurriii/slythr.git
+   cd slythr
    cp .env.example .env
    ```
 
@@ -143,7 +143,7 @@ make docs             # Generate Swagger documentation
 ## Project Structure
 
 ```
-slythr-go-backend/
+slythr/
 ├── cmd/api/                    # Application entry point
 ├── config/                     # Configuration management
 ├── docs/                       # Swagger API documentation
@@ -181,4 +181,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Issues
 
-- **Issues**: [GitHub Issues](https://github.com/Azzurriii/slythr-go-backend/issues)
+- **Issues**: [GitHub Issues](https://github.com/Azzurriii/slythr/issues)

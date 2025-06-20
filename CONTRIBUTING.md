@@ -16,7 +16,7 @@ How to Contribute
 Click the Fork button on GitHub, then clone your forked repository:
 
 ```bash
-git clone https://github.com/Azzurriii/slythr-go-backend.git
+git clone https://github.com/Azzurriii/slythr.git
 ```
 
 2. Create a Branch

@@ -1,6 +1,6 @@
 .PHONY: build run test docker-build docker-run dev clean fmt lint vet staticcheck install-lint depend-services
 
-APP_NAME=slythr-go-backend
+APP_NAME=slythr
 
 build:
 	mkdir -p bin

@@ -1,8 +1,9 @@
-module github.com/Azzurriii/slythr-go-backend
+module github.com/Azzurriii/slythr
 
 go 1.24.1
 
 require (
+	github.com/Azzurriii/slythr-go-backend v0.0.0-20250618124516-247b0759addb
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.9.0
