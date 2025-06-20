@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
+	"github.com/Azzurriii/slythr/internal/domain/entities"
 )
 
 // DynamicAnalysisRepository defines the contract for dynamic analysis data access

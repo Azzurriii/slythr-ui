@@ -3,8 +3,8 @@ package valueobjects
 import (
 	"strings"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/constants"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
+	"github.com/Azzurriii/slythr/internal/domain/constants"
+	"github.com/Azzurriii/slythr/internal/domain/errors"
 )
 
 type Network struct {

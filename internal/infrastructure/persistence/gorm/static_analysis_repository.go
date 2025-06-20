@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
-	domainerrors "github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
+	"github.com/Azzurriii/slythr/internal/domain/entities"
+	domainerrors "github.com/Azzurriii/slythr/internal/domain/errors"
+	"github.com/Azzurriii/slythr/internal/domain/repository"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

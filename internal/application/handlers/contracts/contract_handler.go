@@ -3,10 +3,10 @@ package contracts
 import (
 	"net/http"
 
-	contractsDTO "github.com/Azzurriii/slythr-go-backend/internal/application/dto/contracts"
-	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/constants"
-	domainerrors "github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
+	contractsDTO "github.com/Azzurriii/slythr/internal/application/dto/contracts"
+	"github.com/Azzurriii/slythr/internal/application/services"
+	"github.com/Azzurriii/slythr/internal/domain/constants"
+	domainerrors "github.com/Azzurriii/slythr/internal/domain/errors"
 	"github.com/gin-gonic/gin"
 )
 

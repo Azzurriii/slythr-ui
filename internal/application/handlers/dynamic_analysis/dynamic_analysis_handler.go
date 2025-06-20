@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/analysis"
-	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
+	"github.com/Azzurriii/slythr/internal/application/dto/analysis"
+	"github.com/Azzurriii/slythr/internal/application/services"
 	"github.com/gin-gonic/gin"
 )
 

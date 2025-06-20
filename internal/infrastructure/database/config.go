@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	config "github.com/Azzurriii/slythr-go-backend/config"
+	config "github.com/Azzurriii/slythr/config"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

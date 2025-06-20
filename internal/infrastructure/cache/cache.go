@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/analysis"
-	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/contracts"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
+	"github.com/Azzurriii/slythr/internal/application/dto/analysis"
+	"github.com/Azzurriii/slythr/internal/application/dto/contracts"
+	"github.com/Azzurriii/slythr/internal/domain/entities"
+	"github.com/Azzurriii/slythr/internal/domain/repository"
 	"github.com/redis/go-redis/v9"
 )
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/errors"
+	"github.com/Azzurriii/slythr/internal/domain/errors"
 )
 
 type AnalysisResults struct {

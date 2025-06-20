@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	config "github.com/Azzurriii/slythr-go-backend/config"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/constants"
+	config "github.com/Azzurriii/slythr/config"
+	"github.com/Azzurriii/slythr/internal/domain/constants"
 )
 
 const (

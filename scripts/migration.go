@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	config "github.com/Azzurriii/slythr-go-backend/config"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/entities"
+	config "github.com/Azzurriii/slythr/config"
+	"github.com/Azzurriii/slythr/internal/domain/entities"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

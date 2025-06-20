@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	config "github.com/Azzurriii/slythr-go-backend/config"
-	"github.com/Azzurriii/slythr-go-backend/internal/application/dto/analysis"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
-	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/cache"
-	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/external"
-	"github.com/Azzurriii/slythr-go-backend/pkg/utils"
+	config "github.com/Azzurriii/slythr/config"
+	"github.com/Azzurriii/slythr/internal/application/dto/analysis"
+	"github.com/Azzurriii/slythr/internal/domain/repository"
+	"github.com/Azzurriii/slythr/internal/infrastructure/cache"
+	"github.com/Azzurriii/slythr/internal/infrastructure/external"
+	"github.com/Azzurriii/slythr/pkg/utils"
 	"github.com/redis/go-redis/v9"
 )
 

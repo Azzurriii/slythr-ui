@@ -1,14 +1,14 @@
 package routes
 
 import (
-	config "github.com/Azzurriii/slythr-go-backend/config"
-	contractHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/contracts"
-	dynamicAnalysisHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/dynamic_analysis"
-	staticAnalysisHandlers "github.com/Azzurriii/slythr-go-backend/internal/application/handlers/static_analysis"
-	"github.com/Azzurriii/slythr-go-backend/internal/application/services"
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/repository"
-	"github.com/Azzurriii/slythr-go-backend/internal/infrastructure/external"
-	"github.com/Azzurriii/slythr-go-backend/internal/interface/http/middleware"
+	config "github.com/Azzurriii/slythr/config"
+	contractHandlers "github.com/Azzurriii/slythr/internal/application/handlers/contracts"
+	dynamicAnalysisHandlers "github.com/Azzurriii/slythr/internal/application/handlers/dynamic_analysis"
+	staticAnalysisHandlers "github.com/Azzurriii/slythr/internal/application/handlers/static_analysis"
+	"github.com/Azzurriii/slythr/internal/application/services"
+	"github.com/Azzurriii/slythr/internal/domain/repository"
+	"github.com/Azzurriii/slythr/internal/infrastructure/external"
+	"github.com/Azzurriii/slythr/internal/interface/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 

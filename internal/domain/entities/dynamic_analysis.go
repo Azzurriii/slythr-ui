@@ -3,7 +3,7 @@ package entities
 import (
 	"time"
 
-	"github.com/Azzurriii/slythr-go-backend/internal/domain/valueobjects"
+	"github.com/Azzurriii/slythr/internal/domain/valueobjects"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
