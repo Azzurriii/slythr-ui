@@ -14,7 +14,6 @@ import (
 	"github.com/Azzurriii/slythr/internal/domain/constants"
 )
 
-// Constants for better maintainability
 const (
 	DefaultModel      = "gemini-2.0-flash"
 	DefaultTimeout    = 30 * time.Second
@@ -23,7 +22,6 @@ const (
 	MaxSourceCodeSize = 1024 * 1024
 )
 
-// Risk levels
 type RiskLevel string
 
 const (
@@ -33,7 +31,6 @@ const (
 	RiskLevelCritical RiskLevel = "CRITICAL"
 )
 
-// GeminiClient represents the Gemini API client with enhanced configuration
 type GeminiClient struct {
 	apiKey     string
 	model      string
@@ -42,21 +39,18 @@ type GeminiClient struct {
 	maxRetries int
 }
 
-// GeminiClientOptions allows for flexible client configuration
 type GeminiClientOptions struct {
 	Model      string
 	Timeout    time.Duration
 	MaxRetries int
 }
 
-// GeminiRequest represents the request structure for Gemini API
 type GeminiRequest struct {
 	Contents         []GeminiContent   `json:"contents"`
 	GenerationConfig *GenerationConfig `json:"generationConfig,omitempty"`
 	SafetySettings   []SafetySetting   `json:"safetySettings,omitempty"`
 }
 
-// GenerationConfig controls the generation parameters
 type GenerationConfig struct {
 	Temperature     float32 `json:"temperature,omitempty"`
 	TopK            int     `json:"topK,omitempty"`
@@ -64,42 +58,35 @@ type GenerationConfig struct {
 	MaxOutputTokens int     `json:"maxOutputTokens,omitempty"`
 }
 
-// SafetySetting configures safety filtering
 type SafetySetting struct {
 	Category  string `json:"category"`
 	Threshold string `json:"threshold"`
 }
 
-// GeminiContent represents the content in the request
 type GeminiContent struct {
 	Parts []GeminiPart `json:"parts"`
 	Role  string       `json:"role,omitempty"`
 }
 
-// GeminiPart represents a part of the content
 type GeminiPart struct {
 	Text string `json:"text"`
 }
 
-// GeminiResponse represents the response from Gemini API
 type GeminiResponse struct {
 	Candidates     []GeminiCandidate `json:"candidates"`
 	PromptFeedback *PromptFeedback   `json:"promptFeedback,omitempty"`
 }
 
-// PromptFeedback contains feedback about the prompt
 type PromptFeedback struct {
 	BlockReason   string         `json:"blockReason,omitempty"`
 	SafetyRatings []SafetyRating `json:"safetyRatings,omitempty"`
 }
 
-// SafetyRating represents safety assessment
 type SafetyRating struct {
 	Category    string `json:"category"`
 	Probability string `json:"probability"`
 }
 
-// GeminiCandidate represents a candidate response
 type GeminiCandidate struct {
 	Content       GeminiContentResponse `json:"content"`
 	FinishReason  string                `json:"finishReason,omitempty"`
@@ -107,25 +94,21 @@ type GeminiCandidate struct {
 	SafetyRatings []SafetyRating        `json:"safetyRatings,omitempty"`
 }
 
-// GeminiContentResponse represents the content in the response
 type GeminiContentResponse struct {
 	Parts []GeminiPartResponse `json:"parts"`
 	Role  string               `json:"role,omitempty"`
 }
 
-// GeminiPartResponse represents a part in the response
 type GeminiPartResponse struct {
 	Text string `json:"text"`
 }
 
-// SecurityAnalysis represents the structured analysis result
 type SecurityAnalysis struct {
 	Success  bool               `json:"success"`
 	Analysis SecurityAssessment `json:"analysis"`
 	Error    string             `json:"error,omitempty"`
 }
 
-// SecurityAssessment contains the detailed security analysis
 type SecurityAssessment struct {
 	SecurityScore   int             `json:"security_score"`
 	RiskLevel       RiskLevel       `json:"risk_level"`
@@ -135,7 +118,6 @@ type SecurityAssessment struct {
 	Recommendations interface{}     `json:"recommendations"`
 }
 
-// Vulnerability represents a security vulnerability
 type Vulnerability struct {
 	Title          string      `json:"title"`
 	Severity       RiskLevel   `json:"severity"`
@@ -144,7 +126,6 @@ type Vulnerability struct {
 	Recommendation interface{} `json:"recommendation"`
 }
 
-// Custom errors
 type GeminiError struct {
 	Message    string
 	StatusCode int
@@ -155,7 +136,6 @@ func (e *GeminiError) Error() string {
 	return fmt.Sprintf("gemini api error (status %d): %s", e.StatusCode, e.Message)
 }
 
-// NewGeminiClient creates a new Gemini API client with enhanced configuration
 func NewGeminiClient(config config.GeminiConfig, opts *GeminiClientOptions) *GeminiClient {
 	if opts == nil {
 		opts = &GeminiClientOptions{}
@@ -193,9 +173,7 @@ func NewGeminiClient(config config.GeminiConfig, opts *GeminiClientOptions) *Gem
 	}
 }
 
-// AnalyzeSmartContract analyzes a smart contract using Gemini AI with enhanced error handling
 func (g *GeminiClient) AnalyzeSmartContract(ctx context.Context, sourceCode string) (*SecurityAnalysis, error) {
-	// Validate input
 	if err := g.validateSourceCode(sourceCode); err != nil {
 		return nil, fmt.Errorf("invalid source code: %w", err)
 	}
@@ -212,7 +190,7 @@ func (g *GeminiClient) AnalyzeSmartContract(ctx context.Context, sourceCode stri
 			},
 		},
 		GenerationConfig: &GenerationConfig{
-			Temperature:     0.1, // Low temperature for consistent analysis
+			Temperature:     0.1,
 			MaxOutputTokens: 4096,
 		},
 		SafetySettings: g.getDefaultSafetySettings(),
@@ -227,12 +205,10 @@ func (g *GeminiClient) AnalyzeSmartContract(ctx context.Context, sourceCode stri
 		return nil, fmt.Errorf("empty response from Gemini API")
 	}
 
-	// Check for content blocking
 	if response.PromptFeedback != nil && response.PromptFeedback.BlockReason != "" {
 		return nil, fmt.Errorf("request blocked: %s", response.PromptFeedback.BlockReason)
 	}
 
-	// Parse the JSON response
 	responseText := response.Candidates[0].Content.Parts[0].Text
 	analysis, err := g.parseAnalysisResponse(responseText)
 	if err != nil {
@@ -242,7 +218,6 @@ func (g *GeminiClient) AnalyzeSmartContract(ctx context.Context, sourceCode stri
 	return analysis, nil
 }
 
-// validateSourceCode validates the input source code
 func (g *GeminiClient) validateSourceCode(sourceCode string) error {
 	if strings.TrimSpace(sourceCode) == "" {
 		return fmt.Errorf("source code cannot be empty")
@@ -255,7 +230,6 @@ func (g *GeminiClient) validateSourceCode(sourceCode string) error {
 	return nil
 }
 
-// getDefaultSafetySettings returns default safety settings
 func (g *GeminiClient) getDefaultSafetySettings() []SafetySetting {
 	return []SafetySetting{
 		{Category: "HARM_CATEGORY_HARASSMENT", Threshold: "BLOCK_MEDIUM_AND_ABOVE"},
@@ -265,14 +239,11 @@ func (g *GeminiClient) getDefaultSafetySettings() []SafetySetting {
 	}
 }
 
-// buildSecurityAnalysisPrompt builds an enhanced prompt for security analysis
 func (g *GeminiClient) buildSecurityAnalysisPrompt(sourceCode string) string {
-	return constants.SystemPrompt + sourceCode
+	return constants.AnalysisPrompt + sourceCode
 }
 
-// parseAnalysisResponse parses the JSON response from Gemini
 func (g *GeminiClient) parseAnalysisResponse(responseText string) (*SecurityAnalysis, error) {
-	// Clean the response text to extract JSON
 	jsonStart := strings.Index(responseText, "{")
 	jsonEnd := strings.LastIndex(responseText, "}")
 
@@ -290,13 +261,11 @@ func (g *GeminiClient) parseAnalysisResponse(responseText string) (*SecurityAnal
 	return &analysis, nil
 }
 
-// makeRequestWithRetry makes an HTTP request with retry logic
 func (g *GeminiClient) makeRequestWithRetry(ctx context.Context, request GeminiRequest) (*GeminiResponse, error) {
 	var lastErr error
 
 	for attempt := 0; attempt <= g.maxRetries; attempt++ {
 		if attempt > 0 {
-			// Wait before retry
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -311,10 +280,8 @@ func (g *GeminiClient) makeRequestWithRetry(ctx context.Context, request GeminiR
 
 		lastErr = err
 
-		// Check if error is retryable
 		if geminiErr, ok := err.(*GeminiError); ok {
 			if geminiErr.StatusCode >= 400 && geminiErr.StatusCode < 500 && geminiErr.StatusCode != 429 {
-				// Client error (non-retryable except for rate limiting)
 				break
 			}
 		}
@@ -323,7 +290,6 @@ func (g *GeminiClient) makeRequestWithRetry(ctx context.Context, request GeminiR
 	return nil, fmt.Errorf("request failed after %d attempts: %w", g.maxRetries+1, lastErr)
 }
 
-// makeRequest makes an HTTP request to Gemini API with improved error handling
 func (g *GeminiClient) makeRequest(ctx context.Context, request GeminiRequest) (*GeminiResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
@@ -346,14 +312,12 @@ func (g *GeminiClient) makeRequest(ctx context.Context, request GeminiRequest) (
 	}
 	defer resp.Body.Close()
 
-	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Try to parse error response
 		var errorResp map[string]interface{}
 		if json.Unmarshal(body, &errorResp) == nil {
 			if errorMsg, ok := errorResp["error"].(map[string]interface{}); ok {
@@ -380,12 +344,83 @@ func (g *GeminiClient) makeRequest(ctx context.Context, request GeminiRequest) (
 	return &response, nil
 }
 
-// GetModel returns the current model being used
 func (g *GeminiClient) GetModel() string {
 	return g.model
 }
 
-// SetTimeout updates the HTTP client timeout
 func (g *GeminiClient) SetTimeout(timeout time.Duration) {
 	g.httpClient.Timeout = timeout
+}
+
+func (g *GeminiClient) GenerateTestCases(ctx context.Context, sourceCode, testFramework, testLanguage string, staticAnalysis, securityAnalysis interface{}) (string, error) {
+	if err := g.validateSourceCode(sourceCode); err != nil {
+		return "", fmt.Errorf("invalid source code: %w", err)
+	}
+
+	if strings.TrimSpace(testFramework) == "" {
+		return "", fmt.Errorf("test framework cannot be empty")
+	}
+
+	if strings.TrimSpace(testLanguage) == "" {
+		return "", fmt.Errorf("test language cannot be empty")
+	}
+
+	prompt := g.buildTestCaseGenerationPrompt(sourceCode, testFramework, testLanguage, staticAnalysis, securityAnalysis)
+
+	request := GeminiRequest{
+		Contents: []GeminiContent{
+			{
+				Parts: []GeminiPart{
+					{Text: prompt},
+				},
+				Role: "user",
+			},
+		},
+		GenerationConfig: &GenerationConfig{
+			Temperature:     0.2, // Slightly higher temperature for more creative test generation
+			MaxOutputTokens: 8192,
+		},
+		SafetySettings: g.getDefaultSafetySettings(),
+	}
+
+	response, err := g.makeRequestWithRetry(ctx, request)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate test cases from Gemini: %w", err)
+	}
+
+	if len(response.Candidates) == 0 || len(response.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("empty response from Gemini API")
+	}
+
+	if response.PromptFeedback != nil && response.PromptFeedback.BlockReason != "" {
+		return "", fmt.Errorf("request blocked: %s", response.PromptFeedback.BlockReason)
+	}
+
+	return response.Candidates[0].Content.Parts[0].Text, nil
+}
+
+func (g *GeminiClient) buildTestCaseGenerationPrompt(sourceCode, testFramework, testLanguage string, staticAnalysis, securityAnalysis interface{}) string {
+	prompt := constants.TestcaseGeneratePrompt
+
+	prompt = strings.ReplaceAll(prompt, "{contracts}", sourceCode)
+	prompt = strings.ReplaceAll(prompt, "{testFramework}", testFramework)
+	prompt = strings.ReplaceAll(prompt, "{testLanguage}", testLanguage)
+
+	staticAnalysisJSON := "No static analysis available"
+	if staticAnalysis != nil {
+		if jsonBytes, err := json.MarshalIndent(staticAnalysis, "", "  "); err == nil {
+			staticAnalysisJSON = string(jsonBytes)
+		}
+	}
+	prompt = strings.ReplaceAll(prompt, "{slitherAnalysis}", staticAnalysisJSON)
+
+	securityAnalysisJSON := "No security analysis available"
+	if securityAnalysis != nil {
+		if jsonBytes, err := json.MarshalIndent(securityAnalysis, "", "  "); err == nil {
+			securityAnalysisJSON = string(jsonBytes)
+		}
+	}
+	prompt = strings.ReplaceAll(prompt, "{securityAnalysis}", securityAnalysisJSON)
+
+	return prompt
 }

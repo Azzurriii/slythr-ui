@@ -8,6 +8,22 @@ definitions:
     required:
     - source_code
     type: object
+  testcase_generation.TestCaseGenerateRequest:
+    properties:
+      source_code:
+        minLength: 1
+        type: string
+      test_framework:
+        example: hardhat
+        type: string
+      test_language:
+        example: javascript
+        type: string
+    required:
+    - source_code
+    - test_framework
+    - test_language
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -106,6 +122,24 @@ paths:
       summary: Analyze Solidity contract using AI for security vulnerabilities
       tags:
       - dynamic-analysis
+  /dynamic-analysis/{sourceHash}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves dynamic analysis result from cache or database using
+        source hash
+      parameters:
+      - description: Source hash
+        in: path
+        name: sourceHash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      summary: Get dynamic analysis result by source hash
+      tags:
+      - dynamic-analysis
   /static-analysis:
     post:
       consumes:
@@ -125,6 +159,60 @@ paths:
       summary: Analyze Solidity contract for security vulnerabilities
       tags:
       - static-analysis
+  /static-analysis/{sourceHash}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves static analysis result from cache or database using source
+        hash
+      parameters:
+      - description: Source hash
+        in: path
+        name: sourceHash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      summary: Get static analysis result by source hash
+      tags:
+      - static-analysis
+  /test-cases/{sourceHash}:
+    get:
+      consumes:
+      - application/json
+      description: Gets test cases for Solidity contract by source hash
+      parameters:
+      - description: Source hash
+        in: path
+        name: sourceHash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      summary: Get test cases for Solidity contract
+      tags:
+      - testcase-generation
+  /test-cases/generate:
+    post:
+      consumes:
+      - application/json
+      description: Generates test cases for Solidity contract using Gemini AI with
+        comprehensive analysis
+      parameters:
+      - description: Contract source code and test preferences
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/testcase_generation.TestCaseGenerateRequest'
+      produces:
+      - application/json
+      responses: {}
+      summary: Generate test cases for Solidity contract
+      tags:
+      - testcase-generation
 schemes:
 - http
 - https

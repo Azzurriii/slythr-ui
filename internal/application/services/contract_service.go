@@ -40,7 +40,7 @@ func NewContractService(repo repository.ContractRepository, client external.Ethe
 
 	return &ContractService{
 		client: client,
-		cache:  cache.NewCache(redisClient, repo, nil, nil),
+		cache:  cache.NewCache(redisClient, repo, nil, nil, nil),
 	}
 }
 

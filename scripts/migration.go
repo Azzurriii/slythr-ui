@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"github.com/Azzurriii/slythr/pkg/logger"
 
 	config "github.com/Azzurriii/slythr/config"
 	"github.com/Azzurriii/slythr/internal/domain/entities"
@@ -12,14 +12,14 @@ import (
 func Migrate() error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		logger.Fatalf("Failed to load config: %v", err)
 		return err
 	}
 
 	dsn := cfg.Database.DSN()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatalf("Failed to connect to database: %v", err)
 		return err
 	}
 
@@ -27,11 +27,12 @@ func Migrate() error {
 		&entities.Contract{},
 		&entities.StaticAnalysis{},
 		&entities.DynamicAnalysis{},
+		&entities.GeneratedTestCases{},
 	); err != nil {
-		log.Fatalf("Migration failed: %v", err)
+		logger.Fatalf("Migration failed: %v", err)
 		return err
 	}
 
-	log.Println("Migration completed successfully!")
+	logger.Info("Migration completed successfully!")
 	return nil
 }

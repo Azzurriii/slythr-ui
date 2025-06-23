@@ -134,6 +134,31 @@ const docTemplate = `{
                 "responses": {}
             }
         },
+        "/dynamic-analysis/{sourceHash}": {
+            "get": {
+                "description": "Retrieves dynamic analysis result from cache or database using source hash",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dynamic-analysis"
+                ],
+                "summary": "Get dynamic analysis result by source hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source hash",
+                        "name": "sourceHash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            }
+        },
         "/static-analysis": {
             "post": {
                 "description": "Performs static security analysis on Solidity source code using Slither",
@@ -160,6 +185,83 @@ const docTemplate = `{
                 ],
                 "responses": {}
             }
+        },
+        "/static-analysis/{sourceHash}": {
+            "get": {
+                "description": "Retrieves static analysis result from cache or database using source hash",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "static-analysis"
+                ],
+                "summary": "Get static analysis result by source hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source hash",
+                        "name": "sourceHash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            }
+        },
+        "/test-cases/generate": {
+            "post": {
+                "description": "Generates test cases for Solidity contract using Gemini AI with comprehensive analysis",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "testcase-generation"
+                ],
+                "summary": "Generate test cases for Solidity contract",
+                "parameters": [
+                    {
+                        "description": "Contract source code and test preferences",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/testcase_generation.TestCaseGenerateRequest"
+                        }
+                    }
+                ],
+                "responses": {}
+            }
+        },
+        "/test-cases/{sourceHash}": {
+            "get": {
+                "description": "Gets test cases for Solidity contract by source hash",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "testcase-generation"
+                ],
+                "summary": "Get test cases for Solidity contract",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source hash",
+                        "name": "sourceHash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            }
         }
     },
     "definitions": {
@@ -172,6 +274,28 @@ const docTemplate = `{
                 "source_code": {
                     "type": "string",
                     "minLength": 1
+                }
+            }
+        },
+        "testcase_generation.TestCaseGenerateRequest": {
+            "type": "object",
+            "required": [
+                "source_code",
+                "test_framework",
+                "test_language"
+            ],
+            "properties": {
+                "source_code": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "test_framework": {
+                    "type": "string",
+                    "example": "hardhat"
+                },
+                "test_language": {
+                    "type": "string",
+                    "example": "javascript"
                 }
             }
         }

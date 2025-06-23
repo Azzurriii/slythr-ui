@@ -3,8 +3,8 @@ package config
 
 import (
 	"fmt"
-	"log"
 
+	"github.com/Azzurriii/slythr/pkg/logger"
 	"github.com/spf13/viper"
 )
 
@@ -69,7 +69,7 @@ func LoadConfig() (*Config, error) {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		logger.Fatalf("Failed to load config: %v", err)
 	}
 
 	config := &Config{

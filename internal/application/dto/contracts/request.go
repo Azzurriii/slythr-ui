@@ -10,13 +10,11 @@ var (
 	ErrInvalidAddress = errors.ErrInvalidAddress
 )
 
-// GetContractSourceCodeRequest represents a request to get contract source code
 type GetContractSourceCodeRequest struct {
 	Address string `json:"address" binding:"required"`
 	Network string `json:"network" binding:"required"`
 }
 
-// Validate validates the GetContractSourceCodeRequest
 func (r *GetContractSourceCodeRequest) Validate() error {
 	if r.Address == "" {
 		return errors.ErrInvalidAddress
@@ -33,7 +31,6 @@ func (r *GetContractSourceCodeRequest) Validate() error {
 	return nil
 }
 
-// CreateContractRequest represents a request to create a contract
 type CreateContractRequest struct {
 	Address         string `json:"address" binding:"required"`
 	Network         string `json:"network" binding:"required"`
@@ -42,7 +39,6 @@ type CreateContractRequest struct {
 	CompilerVersion string `json:"compiler_version" binding:"required"`
 }
 
-// Validate validates the CreateContractRequest
 func (r *CreateContractRequest) Validate() error {
 	if r.Address == "" {
 		return errors.ErrInvalidAddress

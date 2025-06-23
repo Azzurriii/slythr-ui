@@ -49,6 +49,31 @@ func (h *StaticAnalysisHandler) AnalyzeContract(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetStaticAnalysis godoc
+// @Summary Get static analysis result by source hash
+// @Description Retrieves static analysis result from cache or database using source hash
+// @Tags static-analysis
+// @Accept json
+// @Produce json
+// @Param sourceHash path string true "Source hash"
+// @Router /static-analysis/{sourceHash} [get]
+func (h *StaticAnalysisHandler) GetStaticAnalysis(c *gin.Context) {
+	sourceHash := c.Param("sourceHash")
+
+	if strings.TrimSpace(sourceHash) == "" {
+		h.respondError(c, http.StatusBadRequest, "Source hash cannot be empty", nil)
+		return
+	}
+
+	result, err := h.service.GetStaticAnalysis(c.Request.Context(), sourceHash)
+	if err != nil {
+		h.respondError(c, http.StatusNotFound, "Static analysis not found", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *StaticAnalysisHandler) respondError(c *gin.Context, status int, message string, err error) {
 	response := gin.H{
 		"success": false,

@@ -26,6 +26,7 @@ type DynamicAnalysisResponse struct {
 	TotalIssues    int         `json:"total_issues"`
 	AnalyzedAt     time.Time   `json:"analyzed_at"`
 	RawLLMResponse string      `json:"raw_llm_response,omitempty"`
+	SourceHash     string      `json:"source_hash" example:"1234567890"`
 }
 
 type SlitherIssue struct {
@@ -52,4 +53,5 @@ type StaticAnalysisResponse struct {
 	TotalIssues     int             `json:"total_issues" example:"8"`
 	SeveritySummary SeveritySummary `json:"severity_summary"`
 	AnalyzedAt      time.Time       `json:"analyzed_at" example:"2025-06-17T16:19:00.579573+07:00"`
+	SourceHash      string          `json:"source_hash" example:"1234567890"`
 }

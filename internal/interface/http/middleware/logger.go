@@ -3,18 +3,11 @@ package middleware
 import (
 	"time"
 
+	"github.com/Azzurriii/slythr/pkg/logger"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func Logger() gin.HandlerFunc {
-	logger := zap.New(zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		zapcore.AddSync(gin.DefaultWriter),
-		zapcore.InfoLevel,
-	))
-
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -26,20 +19,14 @@ func Logger() gin.HandlerFunc {
 		method := c.Request.Method
 		path := c.Request.URL.Path
 
-		fields := []zap.Field{
-			zap.Int("status", status),
-			zap.String("method", method),
-			zap.String("path", path),
-			zap.Duration("latency", latency),
-		}
-
+		// Log request details with formatted message
 		switch {
 		case status >= 500:
-			logger.Error("Server error", fields...)
+			logger.Default.Errorf("Server error - %s %s [%d] %v", method, path, status, latency)
 		case status >= 400:
-			logger.Warn("Client error", fields...)
+			logger.Default.Warnf("Client error - %s %s [%d] %v", method, path, status, latency)
 		default:
-			logger.Info("Request processed", fields...)
+			logger.Default.Infof("Request processed - %s %s [%d] %v", method, path, status, latency)
 		}
 	}
 }

@@ -49,6 +49,31 @@ func (h *DynamicAnalysisHandler) AnalyzeContract(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetDynamicAnalysis godoc
+// @Summary Get dynamic analysis result by source hash
+// @Description Retrieves dynamic analysis result from cache or database using source hash
+// @Tags dynamic-analysis
+// @Accept json
+// @Produce json
+// @Param sourceHash path string true "Source hash"
+// @Router /dynamic-analysis/{sourceHash} [get]
+func (h *DynamicAnalysisHandler) GetDynamicAnalysis(c *gin.Context) {
+	sourceHash := c.Param("sourceHash")
+
+	if strings.TrimSpace(sourceHash) == "" {
+		h.respondError(c, http.StatusBadRequest, "Source hash cannot be empty", nil)
+		return
+	}
+
+	result, err := h.service.GetDynamicAnalysis(c.Request.Context(), sourceHash)
+	if err != nil {
+		h.respondError(c, http.StatusNotFound, "Dynamic analysis not found", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *DynamicAnalysisHandler) respondError(c *gin.Context, status int, message string, err error) {
 	response := gin.H{
 		"success": false,

@@ -106,13 +106,11 @@ func (r *staticAnalysisRepository) FindByID(ctx context.Context, id entities.Sta
 
 // FindByContractID finds static analyses by contract ID
 func (r *staticAnalysisRepository) FindByContractID(ctx context.Context, contractID entities.ContractID) ([]*entities.StaticAnalysis, error) {
-	// Since we don't have contract_id in static_analysis table, return empty slice
 	return []*entities.StaticAnalysis{}, nil
 }
 
 // FindLatestByContractID finds the latest static analysis for a contract
 func (r *staticAnalysisRepository) FindLatestByContractID(ctx context.Context, contractID entities.ContractID) (*entities.StaticAnalysis, error) {
-	// Since we don't have contract_id in static_analysis table, return not found
 	return nil, domainerrors.ErrStaticAnalysisNotFound
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azzurriii/slythr/internal/application/dto/analysis"
 	"github.com/Azzurriii/slythr/internal/application/dto/contracts"
+	"github.com/Azzurriii/slythr/internal/application/dto/testcase_generation"
 	"github.com/Azzurriii/slythr/internal/domain/entities"
 	"github.com/Azzurriii/slythr/internal/domain/repository"
 	"github.com/redis/go-redis/v9"
@@ -20,6 +21,7 @@ const (
 	contractPrefix        = "contract"
 	dynamicAnalysisPrefix = "dynamic_analysis"
 	staticAnalysisPrefix  = "static_analysis"
+	testCasesPrefix       = "test_cases"
 )
 
 /*
@@ -31,6 +33,7 @@ type Cache struct {
 	contractRepo        repository.ContractRepository
 	dynamicAnalysisRepo repository.DynamicAnalysisRepository
 	staticAnalysisRepo  repository.StaticAnalysisRepository
+	testCasesRepo       repository.GeneratedTestCasesRepository
 }
 
 func NewCache(
@@ -38,12 +41,14 @@ func NewCache(
 	contractRepo repository.ContractRepository,
 	dynamicAnalysisRepo repository.DynamicAnalysisRepository,
 	staticAnalysisRepo repository.StaticAnalysisRepository,
+	testCasesRepo repository.GeneratedTestCasesRepository,
 ) *Cache {
 	return &Cache{
 		redis:               redis,
 		contractRepo:        contractRepo,
 		dynamicAnalysisRepo: dynamicAnalysisRepo,
 		staticAnalysisRepo:  staticAnalysisRepo,
+		testCasesRepo:       testCasesRepo,
 	}
 }
 
@@ -202,6 +207,78 @@ func (c *Cache) SetStaticAnalysis(ctx context.Context, sourceHash string, result
 	return nil
 }
 
+func (c *Cache) GetTestCases(ctx context.Context, sourceHash string) (*testcase_generation.TestCaseGenerateResponse, error) {
+	if c.redis != nil {
+		key := c.buildKey(testCasesPrefix, sourceHash)
+		if data, err := c.redis.Get(ctx, key).Result(); err == nil {
+			var result testcase_generation.TestCaseGenerateResponse
+			if json.Unmarshal([]byte(data), &result) == nil {
+				return &result, nil
+			}
+		}
+	}
+
+	if c.testCasesRepo == nil {
+		return nil, nil
+	}
+
+	exists, err := c.testCasesRepo.ExistsBySourceHash(ctx, sourceHash)
+	if err != nil || !exists {
+		return nil, nil
+	}
+
+	dbTestCases, err := c.testCasesRepo.FindBySourceHash(ctx, sourceHash)
+	if err != nil {
+		return nil, nil
+	}
+
+	// Convert entity to response
+	result := &testcase_generation.TestCaseGenerateResponse{
+		Success:                    true,
+		TestCode:                   dbTestCases.TestCode,
+		TestFramework:              dbTestCases.TestFramework,
+		TestLanguage:               dbTestCases.TestLanguage,
+		FileName:                   dbTestCases.FileName,
+		SourceHash:                 dbTestCases.SourceHash,
+		WarningsAndRecommendations: dbTestCases.GetWarnings(),
+		GeneratedAt:                dbTestCases.CreatedAt,
+	}
+
+	c.setRedisAsync(c.buildKey(testCasesPrefix, sourceHash), result, defaultCacheTTL)
+
+	return result, nil
+}
+
+func (c *Cache) SetTestCases(ctx context.Context, sourceHash string, result *testcase_generation.TestCaseGenerateResponse) error {
+	if c.testCasesRepo != nil {
+		// Convert response to entity
+		testCases, err := entities.NewGeneratedTestCases(
+			sourceHash,
+			result.TestCode,
+			result.TestFramework,
+			result.TestLanguage,
+			result.FileName,
+			result.WarningsAndRecommendations,
+		)
+		if err != nil {
+			// Log error but don't fail the cache operation
+			fmt.Printf("Error creating test cases entity: %v\n", err)
+		} else {
+			if err := c.testCasesRepo.SaveTestCases(ctx, testCases); err != nil {
+				fmt.Printf("Error saving test cases to database: %v\n", err)
+			} else {
+				fmt.Printf("Successfully saved test cases to database for source hash: %s\n", sourceHash)
+			}
+		}
+	} else {
+		fmt.Printf("Test cases repository is nil, skipping database save\n")
+	}
+
+	c.setRedisAsync(c.buildKey(testCasesPrefix, sourceHash), result, defaultCacheTTL)
+	fmt.Printf("Test cases cached in Redis for source hash: %s\n", sourceHash)
+	return nil
+}
+
 func (c *Cache) buildKey(prefix string, parts ...string) string {
 	key := prefix
 	for _, part := range parts {
@@ -246,12 +323,21 @@ func (c *Cache) InvalidateStaticAnalysis(sourceHash string) error {
 	return nil
 }
 
+func (c *Cache) InvalidateTestCases(sourceHash string) error {
+	if c.redis != nil {
+		key := c.buildKey(testCasesPrefix, sourceHash)
+		return c.redis.Del(context.Background(), key).Err()
+	}
+	return nil
+}
+
 func (c *Cache) InvalidateAll() error {
 	if c.redis != nil {
 		patterns := []string{
 			fmt.Sprintf("%s:*", contractPrefix),
 			fmt.Sprintf("%s:*", dynamicAnalysisPrefix),
 			fmt.Sprintf("%s:*", staticAnalysisPrefix),
+			fmt.Sprintf("%s:*", testCasesPrefix),
 		}
 
 		for _, pattern := range patterns {

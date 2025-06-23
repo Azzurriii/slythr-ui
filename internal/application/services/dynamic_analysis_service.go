@@ -51,7 +51,7 @@ func NewDynamicAnalysisService(
 
 	return &DynamicAnalysisService{
 		geminiClient: external.NewGeminiClient(cfg.Gemini, nil),
-		cache:        cache.NewCache(redisClient, contractRepo, dynamicAnalysisRepo, nil),
+		cache:        cache.NewCache(redisClient, contractRepo, dynamicAnalysisRepo, nil, nil),
 	}, nil
 }
 
@@ -81,11 +81,25 @@ func (s *DynamicAnalysisService) AnalyzeContract(ctx context.Context, source str
 		Analysis:    s.convertAnalysis(geminiResult.Analysis),
 		TotalIssues: len(geminiResult.Analysis.Vulnerabilities),
 		AnalyzedAt:  time.Now(),
+		SourceHash:  sourceHash,
 	}
 
 	go s.cache.SetDynamicAnalysis(context.Background(), sourceHash, response)
 
 	return response, nil
+}
+
+// GetDynamicAnalysis retrieves dynamic analysis result by source hash
+func (s *DynamicAnalysisService) GetDynamicAnalysis(ctx context.Context, sourceHash string) (*analysis.DynamicAnalysisResponse, error) {
+	if strings.TrimSpace(sourceHash) == "" {
+		return nil, fmt.Errorf("source hash cannot be empty")
+	}
+
+	if cached, err := s.cache.GetDynamicAnalysis(ctx, sourceHash); err == nil && cached != nil {
+		return cached, nil
+	}
+
+	return nil, fmt.Errorf("dynamic analysis not found for source hash: %s", sourceHash)
 }
 
 func (s *DynamicAnalysisService) convertAnalysis(securityAssessment external.SecurityAssessment) analysis.LLMAnalysis {

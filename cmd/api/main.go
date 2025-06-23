@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,7 +15,7 @@ import (
 	gormRepo "github.com/Azzurriii/slythr/internal/infrastructure/persistence/gorm"
 	routes "github.com/Azzurriii/slythr/internal/interface/http/routes"
 	server "github.com/Azzurriii/slythr/internal/interface/server"
-	logger "github.com/Azzurriii/slythr/pkg/logger"
+	"github.com/Azzurriii/slythr/pkg/logger"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -31,7 +30,7 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		logger.Fatalf("Failed to load config: %v", err)
 	}
 
 	// Init needed configs
@@ -40,7 +39,7 @@ func main() {
 
 	connectionManager, err := database.NewConnectionManager(dbConfig, redisConfig)
 	if err != nil {
-		log.Fatalf("Failed to initialize database connections: %v", err)
+		logger.Fatalf("Failed to initialize database connections: %v", err)
 	}
 	defer connectionManager.Close()
 
@@ -50,23 +49,26 @@ func main() {
 		&entities.Contract{},
 		&entities.StaticAnalysis{},
 		&entities.DynamicAnalysis{},
+		&entities.GeneratedTestCases{},
 	); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+		logger.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	contractRepo := gormRepo.NewContractRepository(db)
 	dynamicAnalysisRepo := gormRepo.NewDynamicAnalysisRepository(db)
 	staticAnalysisRepo := gormRepo.NewStaticAnalysisRepository(db)
+	generatedTestCasesRepo := gormRepo.NewGeneratedTestCasesRepository(db)
 
 	etherscanClient := external.NewEtherscanClient(&cfg.Etherscan)
 
 	routerDependencies := &routes.RouterDependencies{
-		ContractRepo:        contractRepo,
-		DynamicAnalysisRepo: dynamicAnalysisRepo,
-		StaticAnalysisRepo:  staticAnalysisRepo,
-		EtherscanClient:     etherscanClient,
-		Logger:              logger.Default,
-		Config:              cfg,
+		ContractRepo:           contractRepo,
+		DynamicAnalysisRepo:    dynamicAnalysisRepo,
+		StaticAnalysisRepo:     staticAnalysisRepo,
+		GeneratedTestCasesRepo: generatedTestCasesRepo,
+		EtherscanClient:        etherscanClient,
+		Logger:                 logger.Default,
+		Config:                 cfg,
 	}
 
 	router := routes.SetupRouter(routerDependencies)
@@ -88,12 +90,12 @@ func main() {
 
 		// Shutdown server gracefully
 		if err := srv.Shutdown(ctx); err != nil {
-			log.Fatalf("Server shutdown failed: %v", err)
+			logger.Fatalf("Server shutdown failed: %v", err)
 		}
 
 		// Close database connections gracefully
 		if err := connectionManager.Close(); err != nil {
-			log.Printf("Failed to close database connections: %v", err)
+			logger.Errorf("Failed to close database connections: %v", err)
 		}
 
 		logger.Info("Server gracefully stopped")
@@ -101,6 +103,6 @@ func main() {
 
 	port := cfg.Server.Port
 	if err := srv.Start(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Fatalf("Failed to start server: %v", err)
 	}
 }

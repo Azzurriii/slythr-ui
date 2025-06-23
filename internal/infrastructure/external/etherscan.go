@@ -240,36 +240,29 @@ func (c *EtherscanClient) extractMainSource(sourceCode string, contractName stri
 	return c.extractFromRawMap(raw, contractName), nil
 }
 
-// extractFromSources handles the standard multi-file format
 func (c *EtherscanClient) extractFromSources(sourcesRaw json.RawMessage, contractName string) string {
 	var sources map[string]sourceFile
 	if err := json.Unmarshal(sourcesRaw, &sources); err != nil {
 		return ""
 	}
 
-	// Priority order for finding the main contract
 	patterns := []func(string) bool{
-		// 1. Exact match in contracts directory
 		func(path string) bool {
 			return strings.HasSuffix(path, "contracts/"+contractName+".sol")
 		},
-		// 2. Exact filename match
 		func(path string) bool {
 			return strings.HasSuffix(path, "/"+contractName+".sol") || path == contractName+".sol"
 		},
-		// 3. Any file in contracts directory (non-library)
 		func(path string) bool {
 			return strings.Contains(path, "contracts/") &&
 				strings.HasSuffix(path, ".sol") &&
 				!c.isLibraryPath(path)
 		},
-		// 4. Any non-library Solidity file
 		func(path string) bool {
 			return strings.HasSuffix(path, ".sol") && !c.isLibraryPath(path)
 		},
 	}
 
-	// Try each pattern in order
 	for _, pattern := range patterns {
 		for path, file := range sources {
 			if pattern(path) {
@@ -278,7 +271,6 @@ func (c *EtherscanClient) extractFromSources(sourcesRaw json.RawMessage, contrac
 		}
 	}
 
-	// Fallback: return first available file
 	for _, file := range sources {
 		return file.Content
 	}
@@ -286,9 +278,7 @@ func (c *EtherscanClient) extractFromSources(sourcesRaw json.RawMessage, contrac
 	return ""
 }
 
-// extractFromRawMap handles direct map format
 func (c *EtherscanClient) extractFromRawMap(raw map[string]json.RawMessage, contractName string) string {
-	// Similar logic but working with RawMessage
 	patterns := []func(string) bool{
 		func(path string) bool {
 			return strings.HasSuffix(path, "contracts/"+contractName+".sol")
@@ -317,7 +307,6 @@ func (c *EtherscanClient) extractFromRawMap(raw map[string]json.RawMessage, cont
 		}
 	}
 
-	// Fallback
 	for _, rawFile := range raw {
 		var file sourceFile
 		if err := json.Unmarshal(rawFile, &file); err == nil {

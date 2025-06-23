@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Logger interface for server logging
 type Logger interface {
 	Infof(format string, args ...interface{})
 	Errorf(format string, args ...interface{})

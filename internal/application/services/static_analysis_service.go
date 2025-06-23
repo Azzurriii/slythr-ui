@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,7 +49,6 @@ func NewStaticAnalysisService(
 	staticAnalysisRepo repository.StaticAnalysisRepository,
 	opts *StaticAnalysisServiceOptions,
 ) (*StaticAnalysisService, error) {
-	// Set default options
 	containerName := defaultContainerName
 	workspacePath := defaultWorkspacePath
 
@@ -61,7 +61,6 @@ func NewStaticAnalysisService(
 		}
 	}
 
-	// Override with environment variables if set
 	if envContainer := os.Getenv("SLITHER_CONTAINER_NAME"); envContainer != "" {
 		containerName = envContainer
 	}
@@ -69,7 +68,6 @@ func NewStaticAnalysisService(
 		workspacePath = envWorkspace
 	}
 
-	// Setup cache
 	var analysisCache *cache.Cache
 	cfg, err := config.LoadConfig()
 	if err == nil {
@@ -82,7 +80,7 @@ func NewStaticAnalysisService(
 			})
 		}
 
-		analysisCache = cache.NewCache(redisClient, nil, nil, staticAnalysisRepo)
+		analysisCache = cache.NewCache(redisClient, nil, nil, staticAnalysisRepo, nil)
 	}
 
 	return &StaticAnalysisService{
@@ -99,7 +97,6 @@ func (s *StaticAnalysisService) AnalyzeContract(ctx context.Context, source stri
 			fmt.Errorf("slither container not running")
 	}
 
-	// Check cache first
 	sourceHash := utils.GenerateSourceHash(source)
 	if s.cache != nil {
 		if cached, err := s.cache.GetStaticAnalysis(ctx, sourceHash); err == nil && cached != nil {
@@ -111,7 +108,6 @@ func (s *StaticAnalysisService) AnalyzeContract(ctx context.Context, source stri
 	analysisID := uuid.New().String()
 	s.logger.Infof("Starting static analysis with ID: %s, source hash: %s", analysisID, sourceHash)
 
-	// Setup workspace
 	tempDir, err := s.setupWorkspace(analysisID, source)
 	if err != nil {
 		return s.errorResponse(fmt.Sprintf("Failed to setup workspace: %v", err)), err
@@ -131,14 +127,43 @@ func (s *StaticAnalysisService) AnalyzeContract(ctx context.Context, source stri
 	}
 
 	// Parse and return results
-	response := s.buildSuccessResponse(slitherOutput)
+	response := s.buildSuccessResponse(slitherOutput, sourceHash)
 
 	// Cache the result
 	if s.cache != nil {
 		go s.cache.SetStaticAnalysis(context.Background(), sourceHash, response)
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Errorf("Panic during analysis: %v", r)
+			os.RemoveAll(tempDir)
+		}
+	}()
+
+	defer func() {
+		go func() {
+			s.cleanupContainerWorkspace(containerPath)
+		}()
+	}()
+
 	return response, nil
+}
+
+// GetStaticAnalysis retrieves static analysis result by source hash
+func (s *StaticAnalysisService) GetStaticAnalysis(ctx context.Context, sourceHash string) (*analysis.StaticAnalysisResponse, error) {
+	if strings.TrimSpace(sourceHash) == "" {
+		return nil, fmt.Errorf("source hash cannot be empty")
+	}
+
+	if s.cache != nil {
+		if cached, err := s.cache.GetStaticAnalysis(ctx, sourceHash); err == nil && cached != nil {
+			s.logger.Infof("Returning cached static analysis for source hash: %s", sourceHash)
+			return cached, nil
+		}
+	}
+
+	return nil, fmt.Errorf("static analysis not found for source hash: %s", sourceHash)
 }
 
 func (s *StaticAnalysisService) errorResponse(message string) *analysis.StaticAnalysisResponse {
@@ -179,24 +204,26 @@ func (s *StaticAnalysisService) getPackageJSON() string {
 			"@openzeppelin/contracts-upgradeable": "^4.9.0",
 			"@chainlink/contracts": "^0.6.1",
 			"@uniswap/v2-core": "^1.0.1",
-			"@uniswap/v3-core": "^1.0.0"
+			"@uniswap/v3-core": "^1.0.0",
+			"@aave/protocol-v2": "^1.0.0",
+			"@aave/core-v3": "^1.16.2"
 		}
 	}`
 }
 
 func (s *StaticAnalysisService) prepareContainer(tempDir, containerPath string) error {
-	// Copy files to container
-	copyCmd := exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.containerName, s.workspacePath))
-	if err := copyCmd.Run(); err != nil {
-		return fmt.Errorf("failed to copy files to container: %v", err)
-	}
+	go func() {
+		copyCmd := exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.containerName, s.workspacePath))
+		if err := copyCmd.Run(); err != nil {
+			s.logger.Errorf("failed to copy files to container: %v", err)
+		}
 
-	// Install dependencies
-	installCmd := exec.Command("docker", "exec", s.containerName, "bash", "-c",
-		fmt.Sprintf("cd %s && npm install", containerPath))
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install dependencies: %v", err)
-	}
+		installCmd := exec.Command("docker", "exec", s.containerName, "bash", "-c",
+			fmt.Sprintf("cd %s && npm install", containerPath))
+		if err := installCmd.Run(); err != nil {
+			s.logger.Errorf("failed to install dependencies: %v", err)
+		}
+	}()
 
 	return nil
 }
@@ -211,7 +238,7 @@ func (s *StaticAnalysisService) runSlitherAnalysis(containerPath string) (string
 	return s.runSlitherInContainer(containerPath, "Contract.sol", solcVersion)
 }
 
-func (s *StaticAnalysisService) buildSuccessResponse(slitherOutput string) *analysis.StaticAnalysisResponse {
+func (s *StaticAnalysisService) buildSuccessResponse(slitherOutput string, sourceHash string) *analysis.StaticAnalysisResponse {
 	issues := s.parseSlitherOutput(slitherOutput)
 	severitySummary := s.calculateSeveritySummary(issues)
 
@@ -223,6 +250,7 @@ func (s *StaticAnalysisService) buildSuccessResponse(slitherOutput string) *anal
 		TotalIssues:     len(issues),
 		SeveritySummary: severitySummary,
 		AnalyzedAt:      time.Now(),
+		SourceHash:      sourceHash,
 	}
 }
 
@@ -240,7 +268,7 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile,
 	ctx, cancel := context.WithTimeout(context.Background(), analysisTimeout)
 	defer cancel()
 
-	// Build Slither command với --solc-solcs-select flag
+	// Build Slither command with --solc-solcs-select flag
 	slitherCmd := fmt.Sprintf(
 		"cd %s && slither %s --solc-remaps '@openzeppelin=node_modules/@openzeppelin' --solc-solcs-select %s --json -",
 		analysisDir,
@@ -282,67 +310,52 @@ func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile,
 	return output, nil
 }
 
+var (
+	pragmaVersionRegex = regexp.MustCompile(`pragma\s+solidity\s+[^\d]*(\d+\.\d+)`)
+
+	versionMap = map[string]string{
+		"0.8": "0.8.20",
+		"0.7": "0.7.6",
+		"0.6": "0.6.12",
+		"0.5": "0.5.16",
+	}
+)
+
 func (s *StaticAnalysisService) detectSolidityVersion(analysisDir, contractFile string) (string, error) {
-	readCmd := exec.Command("docker", "exec", s.containerName, "cat", filepath.Join(analysisDir, contractFile))
-	output, err := readCmd.Output()
+	cmd := exec.Command("docker", "exec", s.containerName, "head", "-c", "1024", filepath.Join(analysisDir, contractFile))
+	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to read contract file: %v", err)
+		return "0.8.20", nil
 	}
 
-	content := string(output)
-	lines := strings.Split(content, "\n")
+	matches := pragmaVersionRegex.FindSubmatch(output)
+	if len(matches) < 2 {
+		s.logger.Debug("No pragma solidity found, using default version")
+		return "0.8.20", nil
+	}
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "pragma solidity") {
-			version := s.extractVersionFromPragma(line)
-			if version != "" {
-				s.logger.Infof("Detected Solidity version: %s", version)
-				return version, nil
-			}
+	version := string(matches[1])
+	majorMinor := version
+	if len(version) > 3 {
+		majorMinor = version[:3]
+	}
+
+	if ltsVersion, ok := versionMap[majorMinor]; ok {
+		s.logger.Infof("Detected Solidity version: %s", ltsVersion)
+		return ltsVersion, nil
+	}
+
+	// Check if exact version is installed (from Dockerfile)
+	installedVersions := []string{"0.8.20", "0.8.19", "0.8.0", "0.7.6", "0.6.12", "0.5.16"}
+	for _, installed := range installedVersions {
+		if strings.HasPrefix(installed, version) {
+			s.logger.Infof("Detected Solidity version: %s", installed)
+			return installed, nil
 		}
 	}
 
-	return "", fmt.Errorf("no pragma solidity found")
-}
-
-func (s *StaticAnalysisService) extractVersionFromPragma(pragma string) string {
-	// Clean pragma statement
-	pragma = strings.TrimSpace(strings.TrimPrefix(pragma, "pragma solidity"))
-	pragma = strings.TrimSuffix(pragma, ";")
-	pragma = strings.TrimSpace(pragma)
-
-	// Version mapping for common patterns
-	versionMap := map[string]string{
-		"^0.8": "0.8.20",
-		"^0.7": "0.7.6",
-		"^0.6": "0.6.12",
-		"^0.5": "0.5.16",
-	}
-
-	// Check for caret versions
-	for prefix, version := range versionMap {
-		if strings.HasPrefix(pragma, prefix) {
-			return version
-		}
-	}
-
-	// Check for range versions (>=)
-	if strings.HasPrefix(pragma, ">=") {
-		if strings.Contains(pragma, "0.8") {
-			return "0.8.20"
-		}
-		if strings.Contains(pragma, "0.7") {
-			return "0.7.6"
-		}
-	}
-
-	// Check for exact version
-	if len(pragma) > 0 && pragma[0] >= '0' && pragma[0] <= '9' {
-		return strings.Fields(pragma)[0]
-	}
-
-	return "0.8.20" // fallback
+	s.logger.Warnf("Unknown version %s, using default", version)
+	return "0.8.20", nil
 }
 
 func (s *StaticAnalysisService) parseSlitherOutput(output string) []analysis.SlitherIssue {
@@ -409,7 +422,6 @@ func (s *StaticAnalysisService) formatLocation(elements []struct {
 }
 
 func (s *StaticAnalysisService) cleanDescription(description string) string {
-	// Single pass cleaning
 	cleaned := strings.ReplaceAll(description, "\\n", " ")
 	cleaned = strings.ReplaceAll(cleaned, "\\t", " ")
 	cleaned = strings.Join(strings.Fields(cleaned), " ")
@@ -474,4 +486,13 @@ func (s *StaticAnalysisService) GetContainerStatus() (map[string]interface{}, er
 	}
 
 	return status, nil
+}
+
+func (s *StaticAnalysisService) cleanupContainerWorkspace(path string) {
+	// Clean all folder save contract file, keep node_modules, package.json, package-lock.json
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", "exec", s.containerName, "rm", "-rf", path)
+	cmd.Run()
 }
