@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import type {
   StaticAnalysisResponse,
   AIAnalysisResponse,
   TestCaseResponse,
-  ContractSourceResponse,
   NetworkType,
 } from "../types";
 import { AnalysisService } from "../services/analysis";
 import { ContractService } from "../services/contract";
-import { NOTIFICATION_TIMEOUTS } from "../constants";
+import { generateSourceHash } from "../utils";
 
 type LoadingType = "static" | "ai" | "tests" | "fetch" | undefined;
 
@@ -24,6 +23,75 @@ export function useAnalysis() {
     null
   );
   const [activeTab, setActiveTab] = useState("static");
+  const [currentSourceHash, setCurrentSourceHash] = useState<string | null>(
+    null
+  );
+
+  // Load cached results on mount if URL has hash params
+  useEffect(() => {
+    const loadCachedResults = async () => {
+      if (typeof window === "undefined") return;
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const hash = searchParams.get("hash");
+      const tab = searchParams.get("tab");
+
+      // Restore active tab
+      if (tab && ["static", "ai", "tests"].includes(tab)) {
+        setActiveTab(tab);
+      }
+
+      // Load cached analysis results if hash exists
+      if (hash) {
+        setCurrentSourceHash(hash);
+
+        try {
+          // Try to load all analysis results with the same hash
+          const [staticResult, aiResult, testResult] = await Promise.allSettled(
+            [
+              AnalysisService.getCachedStaticAnalysis(hash),
+              AnalysisService.getCachedAIAnalysis(hash),
+              AnalysisService.getCachedTestCases(hash),
+            ]
+          );
+
+          if (staticResult.status === "fulfilled") {
+            setStaticAnalysisResult(staticResult.value);
+          }
+
+          if (aiResult.status === "fulfilled") {
+            setAiAnalysisResult(aiResult.value);
+          }
+
+          if (testResult.status === "fulfilled") {
+            setTestCaseResult(testResult.value);
+          }
+        } catch (error) {
+          console.error("⚠️ Failed to restore analysis results:", error);
+        }
+      }
+    };
+
+    loadCachedResults();
+  }, []);
+
+  // Update URL when analysis results change
+  const updateURL = (hash?: string, tab?: string) => {
+    if (typeof window === "undefined") return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (hash) {
+      searchParams.set("hash", hash);
+      setCurrentSourceHash(hash);
+    }
+    if (tab) {
+      searchParams.set("tab", tab);
+    }
+
+    const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
+    window.history.replaceState(null, "", newUrl);
+  };
 
   const handleStaticAnalysis = async (sourceCode: string) => {
     setIsLoading(true);
@@ -33,6 +101,10 @@ export function useAnalysis() {
     try {
       const result = await AnalysisService.performStaticAnalysis(sourceCode);
       setStaticAnalysisResult(result);
+
+      // Update URL with hash for persistence
+      updateURL(result.source_hash, "static");
+
       toast.success("Static analysis completed successfully!", {
         description: `Found ${result.total_issues} security issues`,
       });
@@ -56,8 +128,12 @@ export function useAnalysis() {
     try {
       const result = await AnalysisService.performAIAnalysis(sourceCode);
       setAiAnalysisResult(result);
+
+      // Update URL with hash for persistence
+      updateURL(result.source_hash, "ai");
+
       toast.success("AI analysis completed successfully!", {
-        description: `Security score: ${result.security_score}/100 (${result.risk_level} risk)`,
+        description: `Security score: ${result.analysis.security_score}/100 (${result.analysis.risk_level} risk)`,
       });
     } catch (err) {
       const errorMessage =
@@ -87,6 +163,10 @@ export function useAnalysis() {
         language
       );
       setTestCaseResult(result);
+
+      // Update URL with hash for persistence
+      updateURL(result.source_hash, "tests");
+
       toast.success("Test cases generated successfully!", {
         description: `Generated tests using ${framework} with ${language}`,
       });
@@ -140,6 +220,54 @@ export function useAnalysis() {
     setStaticAnalysisResult(null);
     setAiAnalysisResult(null);
     setTestCaseResult(null);
+
+    // Clear URL params when clearing results
+    if (typeof window !== "undefined") {
+      const newUrl = window.location.pathname;
+      window.history.replaceState(null, "", newUrl);
+    }
+  };
+
+  // Enhanced setActiveTab that also updates URL
+  const setActiveTabWithURL = (tab: string) => {
+    setActiveTab(tab);
+    updateURL(undefined, tab);
+  };
+
+  // Check if we can instantly load results for current source code
+  const checkCachedResults = async (sourceCode: string) => {
+    const hash = await generateSourceHash(sourceCode);
+
+    if (hash === currentSourceHash) {
+      // Already have results for this source code
+      return;
+    }
+
+    // Try to load cached results for this new source code
+    setCurrentSourceHash(hash);
+    updateURL(hash);
+
+    try {
+      const [staticResult, aiResult, testResult] = await Promise.allSettled([
+        AnalysisService.getCachedStaticAnalysis(hash),
+        AnalysisService.getCachedAIAnalysis(hash),
+        AnalysisService.getCachedTestCases(hash),
+      ]);
+
+      if (staticResult.status === "fulfilled") {
+        setStaticAnalysisResult(staticResult.value);
+      }
+
+      if (aiResult.status === "fulfilled") {
+        setAiAnalysisResult(aiResult.value);
+      }
+
+      if (testResult.status === "fulfilled") {
+        setTestCaseResult(testResult.value);
+      }
+    } catch (error) {
+      console.error(`Error checking cached results: ${error}`);
+    }
   };
 
   return {
@@ -157,6 +285,7 @@ export function useAnalysis() {
     handleGenerateTests,
     handleFetchContract,
     clearAnalysisResults,
-    setActiveTab,
+    setActiveTab: setActiveTabWithURL,
+    checkCachedResults,
   };
 }

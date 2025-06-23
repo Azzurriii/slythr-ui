@@ -54,7 +54,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
     return () => {
       view.destroy();
     };
-  }, []);
+  }, [onChange, value]);
 
   useEffect(() => {
     if (viewRef.current && viewRef.current.state.doc.toString() !== value) {

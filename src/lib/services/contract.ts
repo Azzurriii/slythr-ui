@@ -1,7 +1,5 @@
 import type { ContractSourceResponse, NetworkType } from "../types";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
+import { API_BASE_URL } from "../constants";
 
 export class ContractService {
   static async fetchSourceCode(

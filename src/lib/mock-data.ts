@@ -5,62 +5,102 @@ import type {
 } from "./types";
 
 export const mockStaticAnalysisResult: StaticAnalysisResponse = {
-  total_issues: 3,
-  severity_summary: { high: 1, medium: 1, low: 1, informational: 0 },
+  success: true,
   issues: [
     {
+      type: "detector",
       title: "Reentrancy vulnerability in withdraw function",
       severity: "HIGH",
+      confidence: "High",
       description:
         "The withdraw function is vulnerable to reentrancy attacks. The balance is transferred before the state is updated.",
-      location: "Line 18-21",
+      location: "Contract.sol:L18-L21",
+      reference: "Contract.sol#L18-L21",
     },
     {
+      type: "detector",
       title: "Missing access control",
       severity: "MEDIUM",
+      confidence: "Medium",
       description:
         "The set function lacks proper access control, allowing anyone to modify the stored data.",
-      location: "Line 12-14",
+      location: "Contract.sol:L12-L14",
+      reference: "Contract.sol#L12-L14",
     },
     {
+      type: "detector",
       title: "Unused variable",
       severity: "LOW",
+      confidence: "Low",
       description:
         "The storedData variable is declared as private but could be optimized.",
-      location: "Line 4",
+      location: "Contract.sol:L4",
+      reference: "Contract.sol#L4",
     },
   ],
+  total_issues: 3,
+  severity_summary: { high: 1, medium: 1, low: 1, informational: 0 },
+  analyzed_at: new Date().toISOString(),
+  source_hash: "mock_hash_static_123456789",
 };
 
 export const mockAIAnalysisResult: AIAnalysisResponse = {
-  security_score: 65,
-  risk_level: "MEDIUM",
-  vulnerabilities: [
-    {
-      title: "Potential reentrancy attack vector",
-      severity: "HIGH",
-      description:
-        "The contract's withdraw function follows the check-effects-interactions pattern incorrectly, making it vulnerable to reentrancy attacks.",
-      recommendation:
-        "Use the checks-effects-interactions pattern or implement a reentrancy guard.",
-    },
-    {
-      title: "Centralization risk",
-      severity: "MEDIUM",
-      description:
-        "The contract has a single owner with significant control over funds.",
-      recommendation:
-        "Consider implementing multi-signature or decentralized governance.",
-    },
-  ],
+  success: true,
+  analysis: {
+    security_score: 65,
+    risk_level: "MEDIUM",
+    summary:
+      "The contract has several security issues, including reentrancy and missing access control.",
+    vulnerabilities: [
+      {
+        title: "Potential reentrancy attack vector",
+        severity: "HIGH",
+        description:
+          "The contract's withdraw function follows the check-effects-interactions pattern incorrectly, making it vulnerable to reentrancy attacks.",
+        location: {
+          function: "withdraw()",
+          line_numbers: [18, 21],
+        },
+        recommendation:
+          "Use the checks-effects-interactions pattern or implement a reentrancy guard.",
+      },
+      {
+        title: "Centralization risk",
+        severity: "MEDIUM",
+        description:
+          "The contract has a single owner with significant control over funds.",
+        location: {
+          function: "constructor()",
+          line_numbers: [6, 8],
+        },
+        recommendation:
+          "Consider implementing multi-signature or decentralized governance.",
+      },
+    ],
+    good_practices: [
+      "Uses latest Solidity version with proper license identifier",
+      "Implements proper owner access control pattern",
+    ],
+    recommendations: [
+      "Add event logging for important state changes",
+      "Consider implementing emergency stop functionality",
+      "Add input validation for critical functions",
+    ],
+  },
+  total_issues: 2,
+  analyzed_at: new Date().toISOString(),
+  source_hash: "mock_hash_123456789",
 };
 
 export const generateMockTestResult = (
   framework: string,
   language: string
 ): TestCaseResponse => ({
+  success: true,
   test_framework: framework,
   test_language: language,
+  file_name: `SimpleStorage.test.${language === "typescript" ? "ts" : "js"}`,
+  source_hash: "mock_hash_test_123456789",
   test_code: `const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
@@ -122,4 +162,5 @@ describe("SimpleStorage", function () {
     "Test gas optimization scenarios",
     "Include integration tests with other contracts",
   ],
+  generated_at: new Date().toISOString(),
 });

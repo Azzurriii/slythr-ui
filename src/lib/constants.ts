@@ -33,3 +33,6 @@ export const LOADING_DELAYS = {
   AI_ANALYSIS: 3000,
   TEST_GENERATION: 2500,
 } as const;
+
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
