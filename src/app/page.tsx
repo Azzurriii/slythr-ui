@@ -69,7 +69,7 @@ export default function HomePage() {
       </div>
 
       {/* Right Column - Analysis Panel */}
-      <div className="w-full lg:w-[32rem] xl:w-[36rem] 2xl:w-[40rem] border-t lg:border-t-0 lg:border-l border-border bg-card/50 flex-shrink-0 min-h-0">
+      <div className="w-full lg:w-96 xl:w-[28rem] 2xl:w-[32rem] border-t lg:border-t-0 lg:border-l border-border bg-card/50 flex-shrink-0 min-h-0">
         <AnalysisPanel
           isLoading={isLoading}
           staticAnalysisResult={staticAnalysisResult}
