@@ -35,3 +35,23 @@ export interface TestCaseResponse {
   test_code: string;
   warnings_and_recommendations: string[];
 }
+
+// Types for Fetch Contract API
+export interface ContractSourceResponse {
+  address: string;
+  source_code: string;
+  source_hash: string;
+  network: string;
+}
+
+export type NetworkType =
+  | "ethereum"
+  | "polygon"
+  | "bsc"
+  | "base"
+  | "arbitrum"
+  | "avalanche"
+  | "optimism"
+  | "gnosis"
+  | "fantom"
+  | "celo";
