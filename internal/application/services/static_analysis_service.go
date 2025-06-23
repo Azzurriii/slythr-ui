@@ -33,10 +33,11 @@ const (
 )
 
 type StaticAnalysisService struct {
-	containerName string
-	workspacePath string
-	logger        *logger.Logger
-	cache         *cache.Cache
+	containerName        string
+	workspacePath        string
+	logger               *logger.Logger
+	cache                *cache.Cache
+	isRunningInContainer bool
 }
 
 type StaticAnalysisServiceOptions struct {
@@ -68,6 +69,9 @@ func NewStaticAnalysisService(
 		workspacePath = envWorkspace
 	}
 
+	// Detect if running in container
+	isRunningInContainer := detectContainerEnvironment()
+
 	var analysisCache *cache.Cache
 	cfg, err := config.LoadConfig()
 	if err == nil {
@@ -84,11 +88,34 @@ func NewStaticAnalysisService(
 	}
 
 	return &StaticAnalysisService{
-		containerName: containerName,
-		workspacePath: workspacePath,
-		logger:        logger.Default,
-		cache:         analysisCache,
+		containerName:        containerName,
+		workspacePath:        workspacePath,
+		logger:               logger.Default,
+		cache:                analysisCache,
+		isRunningInContainer: isRunningInContainer,
 	}, nil
+}
+
+// detectContainerEnvironment checks if the application is running inside a container
+func detectContainerEnvironment() bool {
+	// Check if /.dockerenv file exists (standard Docker indicator)
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+
+	// Check if running in Docker Compose environment
+	if os.Getenv("COMPOSE_PROJECT_NAME") != "" {
+		return true
+	}
+
+	// Check cgroup for container indicators
+	if content, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		if strings.Contains(string(content), "docker") || strings.Contains(string(content), "kubepods") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *StaticAnalysisService) AnalyzeContract(ctx context.Context, source string) (*analysis.StaticAnalysisResponse, error) {
@@ -212,18 +239,35 @@ func (s *StaticAnalysisService) getPackageJSON() string {
 }
 
 func (s *StaticAnalysisService) prepareContainer(tempDir, containerPath string) error {
-	go func() {
-		copyCmd := exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.containerName, s.workspacePath))
-		if err := copyCmd.Run(); err != nil {
-			s.logger.Errorf("failed to copy files to container: %v", err)
-		}
+	s.logger.Infof("Preparing container. Running in container: %v", s.isRunningInContainer)
 
-		installCmd := exec.Command("docker", "exec", s.containerName, "bash", "-c",
-			fmt.Sprintf("cd %s && npm install", containerPath))
-		if err := installCmd.Run(); err != nil {
-			s.logger.Errorf("failed to install dependencies: %v", err)
+	// Copy files to container
+	var copyCmd *exec.Cmd
+	if s.isRunningInContainer {
+		// When running in Docker Compose, use shared volume
+		sharedPath := filepath.Join("/workspace", filepath.Base(containerPath))
+		copyCmd = exec.Command("cp", "-r", tempDir+"/*", sharedPath)
+		if err := copyCmd.Run(); err != nil {
+			// Fallback to docker cp
+			copyCmd = exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.containerName, s.workspacePath))
 		}
-	}()
+	} else {
+		// When running locally, use docker cp
+		copyCmd = exec.Command("docker", "cp", tempDir, fmt.Sprintf("%s:%s", s.containerName, s.workspacePath))
+	}
+
+	if err := copyCmd.Run(); err != nil {
+		s.logger.Errorf("failed to copy files to container: %v", err)
+		return fmt.Errorf("failed to copy files to container: %v", err)
+	}
+
+	// Install dependencies
+	installCmd := exec.Command("docker", "exec", s.containerName, "bash", "-c",
+		fmt.Sprintf("cd %s && npm install", containerPath))
+	if err := installCmd.Run(); err != nil {
+		s.logger.Errorf("failed to install dependencies: %v", err)
+		return fmt.Errorf("failed to install dependencies: %v", err)
+	}
 
 	return nil
 }
@@ -255,6 +299,14 @@ func (s *StaticAnalysisService) buildSuccessResponse(slitherOutput string, sourc
 }
 
 func (s *StaticAnalysisService) isContainerRunning() bool {
+	s.logger.Infof("Checking container status. Running in container: %v", s.isRunningInContainer)
+
+	if s.isRunningInContainer {
+		// When running in Docker Compose, use network connectivity check
+		return s.checkSlitherNetworkConnectivity()
+	}
+
+	// When running locally, use docker inspect
 	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", s.containerName)
 	output, err := cmd.Output()
 	if err != nil {
@@ -262,6 +314,25 @@ func (s *StaticAnalysisService) isContainerRunning() bool {
 		return false
 	}
 	return strings.TrimSpace(string(output)) == "true"
+}
+
+// checkSlitherNetworkConnectivity checks if slither container is reachable via network
+func (s *StaticAnalysisService) checkSlitherNetworkConnectivity() bool {
+	// Try to ping slither container via network
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Test if we can reach the slither container using Docker networks
+	cmd := exec.CommandContext(ctx, "docker", "exec", s.containerName, "echo", "test")
+	err := cmd.Run()
+
+	if err != nil {
+		s.logger.Errorf("Cannot reach slither container: %v", err)
+		return false
+	}
+
+	s.logger.Info("Slither container is reachable")
+	return true
 }
 
 func (s *StaticAnalysisService) runSlitherInContainer(analysisDir, contractFile, solcVersion string) (string, error) {
@@ -462,18 +533,41 @@ func (s *StaticAnalysisService) calculateSeveritySummary(issues []analysis.Slith
 
 func (s *StaticAnalysisService) GetContainerStatus() (map[string]interface{}, error) {
 	status := make(map[string]interface{})
+	status["environment"] = map[string]interface{}{
+		"running_in_container": s.isRunningInContainer,
+		"container_name":       s.containerName,
+	}
 
+	if s.isRunningInContainer {
+		// In Docker Compose environment, check network connectivity
+		if s.checkSlitherNetworkConnectivity() {
+			status["exists"] = true
+			status["running"] = true
+			status["status"] = "running"
+			status["connection_method"] = "docker_compose_network"
+		} else {
+			status["exists"] = false
+			status["running"] = false
+			status["error"] = "Cannot reach slither container via network"
+			status["connection_method"] = "docker_compose_network"
+		}
+		return status, nil
+	}
+
+	// Local environment - use docker inspect
 	cmd := exec.Command("docker", "inspect", s.containerName)
 	output, err := cmd.Output()
 	if err != nil {
 		status["exists"] = false
 		status["running"] = false
 		status["error"] = err.Error()
+		status["connection_method"] = "docker_cli"
 		return status, err
 	}
 
 	var containerInfo []map[string]interface{}
 	if err := json.Unmarshal(output, &containerInfo); err != nil {
+		status["connection_method"] = "docker_cli"
 		return status, err
 	}
 
@@ -483,6 +577,7 @@ func (s *StaticAnalysisService) GetContainerStatus() (map[string]interface{}, er
 		status["running"] = state["Running"]
 		status["status"] = state["Status"]
 		status["started_at"] = state["StartedAt"]
+		status["connection_method"] = "docker_cli"
 	}
 
 	return status, nil

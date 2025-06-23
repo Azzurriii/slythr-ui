@@ -41,6 +41,11 @@ services:
     volumes:
       - shared-workspace:/workspace
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Enable privileged mode for Docker socket access
+    privileged: true
+    # Add docker group (group ID 999 is common for docker)
+    group_add:
+      - "999"
     restart: unless-stopped
 
   slither:

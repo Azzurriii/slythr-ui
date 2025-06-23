@@ -74,6 +74,32 @@ func (h *StaticAnalysisHandler) GetStaticAnalysis(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetContainerStatus godoc
+// @Summary Get Slither container status
+// @Description Check if Slither container is running and accessible
+// @Tags static-analysis
+// @Accept json
+// @Produce json
+// @Router /static-analysis/status [get]
+func (h *StaticAnalysisHandler) GetContainerStatus(c *gin.Context) {
+	status, err := h.service.GetContainerStatus()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Failed to get container status",
+			"error":   err.Error(),
+			"data":    status,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Container status retrieved successfully",
+		"data":    status,
+	})
+}
+
 func (h *StaticAnalysisHandler) respondError(c *gin.Context, status int, message string, err error) {
 	response := gin.H{
 		"success": false,

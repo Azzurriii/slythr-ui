@@ -20,6 +20,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api
 FROM alpine:latest
 
 WORKDIR /app
+
+# Install Docker CLI for container interaction
+RUN apk add --no-cache docker-cli
+
 COPY --from=builder /app/main .
 COPY .env . 
 

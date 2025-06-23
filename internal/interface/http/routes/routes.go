@@ -108,6 +108,7 @@ func setupStaticAnalysisRoutes(group *gin.RouterGroup, handler *staticAnalysisHa
 	staticAnalysis := group.Group("/static-analysis")
 	{
 		staticAnalysis.POST("/", handler.AnalyzeContract)
+		staticAnalysis.GET("/status", handler.GetContainerStatus)
 		staticAnalysis.GET("/:sourceHash", handler.GetStaticAnalysis)
 	}
 }
