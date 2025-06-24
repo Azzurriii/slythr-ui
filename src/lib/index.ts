@@ -9,6 +9,7 @@ export * from "./constants";
 
 // Re-export hooks
 export * from "./hooks/use-analysis";
+export * from "./hooks/use-local-storage";
 
 // Re-export services
 export * from "./services/analysis";

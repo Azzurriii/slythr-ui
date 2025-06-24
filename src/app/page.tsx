@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { SlythrActions, CodeEditor, AnalysisPanel } from "@/components";
-import { useAnalysis, DEFAULT_CONTRACT, type NetworkType } from "@/lib";
+import {
+  useAnalysis,
+  useLocalStorage,
+  DEFAULT_CONTRACT,
+  type NetworkType,
+} from "@/lib";
 
 export default function HomePage() {
-  const [sourceCode, setSourceCode] = useState(DEFAULT_CONTRACT);
+  const [sourceCode, setSourceCode] = useLocalStorage(
+    "slythr-source-code",
+    DEFAULT_CONTRACT
+  );
   const {
     isLoading,
     loadingType,
