@@ -16,7 +16,6 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
 
-  // Keep onChange ref updated without causing re-renders
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
@@ -63,9 +62,8 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
       view.destroy();
       viewRef.current = null;
     };
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  // Update editor content when value prop changes externally
   useEffect(() => {
     if (!viewRef.current) return;
 
