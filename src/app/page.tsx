@@ -57,7 +57,7 @@ export default function HomePage() {
       setSourceCode(newSourceCode);
       checkCachedResults(newSourceCode);
     },
-    [checkCachedResults]
+    [setSourceCode, checkCachedResults]
   );
 
   return (

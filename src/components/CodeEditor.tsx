@@ -61,6 +61,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
       view.destroy();
       viewRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
