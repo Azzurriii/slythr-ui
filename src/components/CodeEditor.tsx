@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -14,9 +14,16 @@ interface CodeEditorProps {
 export function CodeEditor({ value, onChange }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const onChangeRef = useRef(onChange);
 
+  // Keep onChange ref updated without causing re-renders
   useEffect(() => {
-    if (!editorRef.current) return;
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  // Initialize editor only once
+  useEffect(() => {
+    if (!editorRef.current || viewRef.current) return;
 
     const state = EditorState.create({
       doc: value,
@@ -26,7 +33,8 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
         oneDark,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChange(update.state.doc.toString());
+            const newValue = update.state.doc.toString();
+            onChangeRef.current(newValue);
           }
         }),
         EditorView.theme({
@@ -53,18 +61,24 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
 
     return () => {
       view.destroy();
+      viewRef.current = null;
     };
-  }, [onChange, value]);
+  }, []); // Empty dependency array - only run once
 
+  // Update editor content when value prop changes externally
   useEffect(() => {
-    if (viewRef.current && viewRef.current.state.doc.toString() !== value) {
-      viewRef.current.dispatch({
+    if (!viewRef.current) return;
+
+    const currentValue = viewRef.current.state.doc.toString();
+    if (currentValue !== value) {
+      const transaction = viewRef.current.state.update({
         changes: {
           from: 0,
-          to: viewRef.current.state.doc.length,
+          to: currentValue.length,
           insert: value,
         },
       });
+      viewRef.current.dispatch(transaction);
     }
   }, [value]);
 

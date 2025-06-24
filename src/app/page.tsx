@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { SlythrActions, CodeEditor, AnalysisPanel } from "@/components";
 import { useAnalysis, DEFAULT_CONTRACT, type NetworkType } from "@/lib";
 
@@ -44,10 +44,13 @@ export default function HomePage() {
   };
 
   // Check for cached results when source code changes
-  const handleSourceCodeChange = (newSourceCode: string) => {
-    setSourceCode(newSourceCode);
-    checkCachedResults(newSourceCode);
-  };
+  const handleSourceCodeChange = useCallback(
+    (newSourceCode: string) => {
+      setSourceCode(newSourceCode);
+      checkCachedResults(newSourceCode);
+    },
+    [checkCachedResults]
+  );
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-3.5rem)] min-h-0">
