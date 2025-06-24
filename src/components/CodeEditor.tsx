@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -20,7 +20,6 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Initialize editor only once
   useEffect(() => {
     if (!editorRef.current || viewRef.current) return;
 
