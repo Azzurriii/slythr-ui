@@ -72,7 +72,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
     <div className="h-full flex flex-col">
       <div className="border-b border-border bg-muted/50 px-4 py-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Contract.sol</span>
+          <span className="text-sm font-bold font-courier">Contract.sol</span>
           <div className="flex items-center space-x-2 text-xs text-muted-foreground">
             <span>Solidity</span>
             <span>•</span>
